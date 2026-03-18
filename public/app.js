@@ -1,5 +1,7 @@
 const form = document.getElementById("config-form");
 const statusEl = document.getElementById("status");
+const loginEyebrow = document.getElementById("login-eyebrow");
+const loginTitle = document.getElementById("login-title");
 const loginCopy = document.getElementById("login-copy");
 const emailGroup = document.getElementById("email-group");
 const tokenGroup = document.getElementById("token-group");
@@ -344,9 +346,10 @@ function applyManagedAuthUi(config) {
     tokenGroup.classList.add("hidden");
     document.getElementById("email").required = false;
     document.getElementById("apiToken").required = false;
+    loginEyebrow.textContent = "Project";
+    loginTitle.textContent = "Project Selection";
     loginCopy.textContent =
-      "Jira credentials are managed by the deployment. Load projects first, then generate the report once the project is selected.";
-    statusEl.textContent = "Jira credentials are configured for this deployment.";
+      "Jira credentials are managed by the deployment. Load projects, choose a project, then generate the report.";
     return;
   }
 
@@ -354,6 +357,10 @@ function applyManagedAuthUi(config) {
   tokenGroup.classList.remove("hidden");
   document.getElementById("email").required = true;
   document.getElementById("apiToken").required = true;
+  loginEyebrow.textContent = "Connect";
+  loginTitle.textContent = "Jira Access";
+  loginCopy.textContent =
+    "Load available projects first, then generate the report once the project is selected.";
 }
 
 function getSelectedProject() {
