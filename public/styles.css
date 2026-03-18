@@ -77,6 +77,15 @@ h1 {
   box-shadow: 0 20px 60px rgba(11, 108, 240, 0.08);
 }
 
+.input-focus-card label {
+  padding: 12px;
+  border: 1px solid rgba(11, 108, 240, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 .login-card {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 244, 238, 0.9)),
@@ -169,6 +178,22 @@ select {
   background: var(--surface-strong);
   padding: 14px 16px;
   color: var(--text);
+}
+
+.input-focus-card input,
+.input-focus-card select {
+  border-color: rgba(11, 108, 240, 0.22);
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(11, 108, 240, 0.04);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 13px 16px;
+}
+
+.input-focus-card input:focus,
+.input-focus-card select:focus {
+  outline: 3px solid rgba(11, 108, 240, 0.12);
+  border-color: rgba(11, 108, 240, 0.42);
 }
 
 button {
@@ -284,7 +309,7 @@ button:disabled {
 }
 
 .performance-group {
-  grid-column: span 1;
+  grid-column: 1 / -1;
   background: linear-gradient(180deg, rgba(250, 248, 255, 0.96), rgba(239, 234, 248, 0.9));
 }
 
@@ -336,6 +361,25 @@ button:disabled {
 .metric-item.neutral {
   background: rgba(255, 255, 255, 0.72);
   border-color: rgba(29, 35, 43, 0.08);
+}
+
+.performance-group .slip-gain-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: start;
+}
+
+.performance-group .metric-item {
+  padding: 11px 12px;
+  gap: 3px;
+  min-height: 116px;
+  align-content: start;
+}
+
+.performance-group .metric-item strong {
+  font-size: 1.1rem;
+  min-height: 2.4em;
+  display: flex;
+  align-items: center;
 }
 
 .metric-progress-track {
