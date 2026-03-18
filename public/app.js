@@ -1,3 +1,11 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const authCard = document.getElementById("auth-card");
+const appShell = document.getElementById("app-shell");
+const authStatusEl = document.getElementById("auth-status");
+const signupForm = document.getElementById("signup-form");
+const signinForm = document.getElementById("signin-form");
+
 const form = document.getElementById("config-form");
 const statusEl = document.getElementById("status");
 const loginEyebrow = document.getElementById("login-eyebrow");
@@ -31,10 +39,19 @@ let loadedProjects = [];
 let latestBaseSummary = null;
 let latestRenderedSummary = null;
 let managedAuth = false;
+let authEnabled = false;
+let allowedEmailDomain = "decode.agency";
+let supabase = null;
+let accessToken = null;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.classList.toggle("error", isError);
+}
+
+function setAuthStatus(message, isError = false) {
+  authStatusEl.textContent = message;
+  authStatusEl.classList.toggle("error", isError);
 }
 
 function getFormPayload() {
@@ -47,10 +64,17 @@ function getMetadataPayload() {
   return Object.fromEntries(data.entries());
 }
 
+function isAllowedEmail(email) {
+  return String(email || "").toLowerCase().endsWith(`@${allowedEmailDomain}`);
+}
+
 async function postJson(url, payload) {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(payload),
   });
 
@@ -67,7 +91,7 @@ async function postJson(url, payload) {
 async function fetchConfig() {
   const response = await fetch("/api/config");
   if (!response.ok) {
-    return { managedAuth: false };
+    return { managedAuth: false, authEnabled: false };
   }
 
   return response.json();
@@ -200,9 +224,19 @@ function renderSummary(summary) {
 
   const performanceItems = [
     ["Time Spent", formatPercent(summary.timeSpentMetric), summary.timeSpentMetric],
-    ["Time Passed", summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric), summary.timePassedMetric],
+    [
+      "Time Passed",
+      summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric),
+      summary.timePassedMetric,
+    ],
     ["Overall Progress", formatPercent(summary.overallProgress), summary.overallProgress],
-    ["Projection Till Deadline", summary.projectedTimeSpentTillDeadline === null ? "Waiting for dates" : formatPercent(summary.projectedTimeSpentTillDeadline), summary.projectedTimeSpentTillDeadline],
+    [
+      "Projection Till Deadline",
+      summary.projectedTimeSpentTillDeadline === null
+        ? "Waiting for dates"
+        : formatPercent(summary.projectedTimeSpentTillDeadline),
+      summary.projectedTimeSpentTillDeadline,
+    ],
     ["Time Spent Last Week", formatHours(summary.timeSpentLastWeek), null],
   ];
 
@@ -341,6 +375,8 @@ function renderProjectOptions(projects) {
 
 function applyManagedAuthUi(config) {
   managedAuth = Boolean(config?.managedAuth);
+  authEnabled = Boolean(config?.authEnabled);
+  allowedEmailDomain = config?.allowedEmailDomain || "decode.agency";
 
   if (managedAuth) {
     emailGroup.classList.add("hidden");
@@ -419,7 +455,10 @@ function exportCsv() {
     ["Slip/Gain Completed Only", formatHours(summary.slipGainCompletedOnly)],
     ["Slip/Gain Completed Only %", formatPercent(summary.slipGainCompletedOnlyPct)],
     ["Time Spent Metric", formatPercent(summary.timeSpentMetric)],
-    ["Time Passed", summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric)],
+    [
+      "Time Passed",
+      summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric),
+    ],
     ["Overall Progress", formatPercent(summary.overallProgress)],
     ["Time Spent Last Week", formatHours(summary.timeSpentLastWeek)],
     [
@@ -520,80 +559,24 @@ function downloadPdf() {
         <meta charset="UTF-8" />
         <title>${escapeHtml(summary.projectTitle || "Slip Gain Report")}</title>
         <style>
-          body {
-            font-family: "Avenir Next", "Segoe UI", sans-serif;
-            margin: 24px;
-            color: #1d232b;
-          }
+          body { font-family: "Avenir Next", "Segoe UI", sans-serif; margin: 24px; color: #1d232b; }
           h1, h2, p { margin: 0; }
           .page { display: grid; gap: 18px; }
-          .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            border-bottom: 2px solid #d9e4f6;
-            padding-bottom: 14px;
-          }
-          .title-block small, .label {
-            color: #5a6472;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-          }
-          .title-block h1 {
-            margin-top: 6px;
-            font-size: 30px;
-            line-height: 1;
-          }
-          .summary-grid {
-            display: grid;
-            grid-template-columns: 1.2fr 1fr;
-            gap: 18px;
-          }
-          .card {
-            border: 1px solid #d7dee8;
-            border-radius: 16px;
-            padding: 16px;
-          }
-          .card h2 {
-            font-size: 16px;
-            margin-bottom: 12px;
-          }
-          .meta-grid, .metric-grid {
-            display: grid;
-            gap: 10px;
-          }
-          .meta-item, .metric-item {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            font-size: 14px;
-          }
-          .metric-item strong, .meta-item strong {
-            font-size: 14px;
-          }
-          .slip-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-          }
-          .slip-table th, .slip-table td {
-            border-bottom: 1px solid #e5e8ee;
-            padding: 8px 10px;
-            text-align: left;
-            vertical-align: top;
-          }
-          .slip-table th {
-            color: #5a6472;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-          }
+          .topbar { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #d9e4f6; padding-bottom: 14px; }
+          .title-block small, .label { color: #5a6472; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+          .title-block h1 { margin-top: 6px; font-size: 30px; line-height: 1; }
+          .summary-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; }
+          .card { border: 1px solid #d7dee8; border-radius: 16px; padding: 16px; }
+          .card h2 { font-size: 16px; margin-bottom: 12px; }
+          .meta-grid, .metric-grid { display: grid; gap: 10px; }
+          .meta-item, .metric-item { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+          .metric-item strong, .meta-item strong { font-size: 14px; }
+          .slip-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+          .slip-table th, .slip-table td { border-bottom: 1px solid #e5e8ee; padding: 8px 10px; text-align: left; vertical-align: top; }
+          .slip-table th { color: #5a6472; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
           .positive { color: #0f7b48; font-weight: 700; }
           .negative { color: #ba2d0b; font-weight: 700; }
-          @media print {
-            body { margin: 12mm; }
-          }
+          @media print { body { margin: 12mm; } }
         </style>
       </head>
       <body>
@@ -609,7 +592,6 @@ function downloadPdf() {
               <div class="meta-item"><span class="label">Deadline</span><strong>${escapeHtml(formatDate(summary.deadline))}</strong></div>
             </div>
           </section>
-
           <section class="summary-grid">
             <div class="card">
               <h2>Overview</h2>
@@ -627,7 +609,6 @@ function downloadPdf() {
                   .join("")}
               </div>
             </div>
-
             <div class="card">
               <h2>Workbook Metrics</h2>
               <div class="metric-grid">
@@ -644,7 +625,6 @@ function downloadPdf() {
               </div>
             </div>
           </section>
-
           <section class="card">
             <h2>Epic Breakdown</h2>
             <table class="slip-table">
@@ -685,6 +665,82 @@ function downloadPdf() {
   setTimeout(() => {
     URL.revokeObjectURL(url);
   }, 60000);
+}
+
+async function updateAuthState(session) {
+  accessToken = session?.access_token || null;
+
+  if (authEnabled && !session) {
+    authCard.classList.remove("hidden");
+    appShell.classList.add("hidden");
+    return;
+  }
+
+  authCard.classList.add("hidden");
+  appShell.classList.remove("hidden");
+}
+
+async function handleSignUp(event) {
+  event.preventDefault();
+
+  if (!supabase) {
+    return;
+  }
+
+  const email = document.getElementById("signup-email").value.trim();
+  const password = document.getElementById("signup-password").value;
+
+  if (!isAllowedEmail(email)) {
+    setAuthStatus(`Only @${allowedEmailDomain} email addresses are allowed.`, true);
+    return;
+  }
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: window.location.origin,
+    },
+  });
+
+  if (error) {
+    setAuthStatus(error.message, true);
+    return;
+  }
+
+  setAuthStatus("Check your inbox and confirm your email before logging in.");
+}
+
+async function handleSignIn(event) {
+  event.preventDefault();
+
+  if (!supabase) {
+    return;
+  }
+
+  const email = document.getElementById("signin-email").value.trim();
+  const password = document.getElementById("signin-password").value;
+
+  if (!isAllowedEmail(email)) {
+    setAuthStatus(`Only @${allowedEmailDomain} email addresses are allowed.`, true);
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    setAuthStatus(error.message, true);
+    return;
+  }
+
+  setAuthStatus("Signed in.");
+  await updateAuthState(data.session);
+  if (managedAuth) {
+    await loadProjects();
+  }
 }
 
 loadProjectsButton.addEventListener("click", loadProjects);
@@ -730,8 +786,10 @@ reportMetadataForm.addEventListener("input", () => {
   renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
 });
 dismissErrorButton.addEventListener("click", hideError);
+signupForm.addEventListener("submit", handleSignUp);
+signinForm.addEventListener("submit", handleSignIn);
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const today = new Date().toISOString().slice(0, 10);
   const reportCreationDateInput = document.getElementById("reportCreationDate");
 
@@ -739,15 +797,31 @@ document.addEventListener("DOMContentLoaded", () => {
     reportCreationDateInput.value = today;
   }
 
-  fetchConfig()
-    .then((config) => {
-      applyManagedAuthUi(config);
-      if (config?.managedAuth) {
-        return loadProjects();
+  try {
+    const config = await fetchConfig();
+    applyManagedAuthUi(config);
+
+    if (config?.authEnabled && config.supabaseUrl && config.supabaseAnonKey) {
+      supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      await updateAuthState(session);
+      supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+        await updateAuthState(nextSession);
+      });
+
+      if (session && managedAuth) {
+        await loadProjects();
       }
-      return null;
-    })
-    .catch(() => {
-      managedAuth = false;
-    });
+      return;
+    }
+
+    await updateAuthState(null);
+    if (config?.managedAuth) {
+      await loadProjects();
+    }
+  } catch {
+    await updateAuthState(null);
+  }
 });

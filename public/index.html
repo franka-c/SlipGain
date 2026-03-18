@@ -8,6 +8,63 @@
   </head>
   <body>
     <main class="page">
+      <section class="card auth-card hidden" id="auth-card">
+        <div class="section-head login-head">
+          <div>
+            <p class="eyebrow">Access</p>
+            <h2>Sign In</h2>
+          </div>
+          <p id="auth-copy" class="section-copy">Use your `@decode.agency` email to create an account, confirm it from your inbox, and sign in.</p>
+        </div>
+
+        <div class="auth-layout">
+          <form id="signup-form" class="form-grid auth-form">
+            <div class="auth-form-head">
+              <h3>Create account</h3>
+              <p>Only `@decode.agency` email addresses are allowed.</p>
+            </div>
+
+            <label>
+              Work Email
+              <input id="signup-email" name="signupEmail" type="email" placeholder="name@decode.agency" />
+            </label>
+
+            <label>
+              Password
+              <input id="signup-password" name="signupPassword" type="password" placeholder="Create a password" />
+            </label>
+
+            <div class="actions actions-wide">
+              <button type="submit" id="signup-button">Sign Up</button>
+            </div>
+          </form>
+
+          <form id="signin-form" class="form-grid auth-form">
+            <div class="auth-form-head">
+              <h3>Log in</h3>
+              <p>After confirming your email, sign in to access the report.</p>
+            </div>
+
+            <label>
+              Work Email
+              <input id="signin-email" name="signinEmail" type="email" placeholder="name@decode.agency" />
+            </label>
+
+            <label>
+              Password
+              <input id="signin-password" name="signinPassword" type="password" placeholder="Your password" />
+            </label>
+
+            <div class="actions actions-wide">
+              <button type="submit" id="signin-button">Log In</button>
+            </div>
+          </form>
+        </div>
+
+        <p id="auth-status" class="status">Authentication is required for this deployment.</p>
+      </section>
+
+      <section class="hidden" id="app-shell">
       <section class="hero">
         <div>
           <p class="eyebrow">Jira Slip/Gain</p>
@@ -137,8 +194,9 @@
           </table>
         </div>
       </section>
+      </section>
     </main>
 
-    <script src="/app.js"></script>
+    <script type="module" src="/app.js"></script>
   </body>
   </html>
