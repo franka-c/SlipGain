@@ -5,6 +5,7 @@ const loginTitle = document.getElementById("login-title");
 const loginCopy = document.getElementById("login-copy");
 const emailGroup = document.getElementById("email-group");
 const tokenGroup = document.getElementById("token-group");
+const loadProjectsGroup = document.getElementById("load-projects-group");
 const projectPickerGroup = document.getElementById("project-picker-group");
 const generateActionGroup = document.getElementById("generate-action-group");
 const projectEmptyState = document.getElementById("project-empty-state");
@@ -344,17 +345,19 @@ function applyManagedAuthUi(config) {
   if (managedAuth) {
     emailGroup.classList.add("hidden");
     tokenGroup.classList.add("hidden");
+    loadProjectsGroup.classList.add("hidden");
     document.getElementById("email").required = false;
     document.getElementById("apiToken").required = false;
     loginEyebrow.textContent = "Project";
     loginTitle.textContent = "Project Selection";
     loginCopy.textContent =
-      "Jira credentials are managed by the deployment. Load projects, choose a project, then generate the report.";
+      "Jira credentials are managed by the deployment. Choose a project, then generate the report.";
     return;
   }
 
   emailGroup.classList.remove("hidden");
   tokenGroup.classList.remove("hidden");
+  loadProjectsGroup.classList.remove("hidden");
   document.getElementById("email").required = true;
   document.getElementById("apiToken").required = true;
   loginEyebrow.textContent = "Connect";
@@ -365,6 +368,33 @@ function applyManagedAuthUi(config) {
 
 function getSelectedProject() {
   return loadedProjects.find((project) => project.key === projectSelect.value) || null;
+}
+
+async function loadProjects() {
+  const payload = getFormPayload();
+  setStatus("Loading Jira projects...");
+
+  try {
+    const data = await postJson("/api/projects", payload);
+    hideError();
+    loadedProjects = data.projects;
+    renderProjectOptions(loadedProjects);
+    const hasProjects = data.projects.length > 0;
+    projectPickerGroup.classList.toggle("hidden", !hasProjects);
+    generateActionGroup.classList.toggle("hidden", !hasProjects);
+    projectEmptyState.classList.toggle("hidden", hasProjects);
+    setStatus(
+      hasProjects
+        ? `Loaded ${data.projects.length} projects.`
+        : "No Jira projects were returned for this account."
+    );
+  } catch (error) {
+    loadedProjects = [];
+    projectPickerGroup.classList.add("hidden");
+    generateActionGroup.classList.add("hidden");
+    projectEmptyState.classList.add("hidden");
+    setStatus(error.message, true);
+  }
 }
 
 function exportCsv() {
@@ -657,29 +687,7 @@ function downloadPdf() {
   }, 60000);
 }
 
-loadProjectsButton.addEventListener("click", async () => {
-  const payload = getFormPayload();
-  setStatus("Loading Jira projects...");
-
-  try {
-    const data = await postJson("/api/projects", payload);
-    hideError();
-    loadedProjects = data.projects;
-    renderProjectOptions(loadedProjects);
-    const hasProjects = data.projects.length > 0;
-    projectPickerGroup.classList.toggle("hidden", !hasProjects);
-    generateActionGroup.classList.toggle("hidden", !hasProjects);
-    projectEmptyState.classList.toggle("hidden", hasProjects);
-
-    setStatus(hasProjects ? `Loaded ${data.projects.length} projects.` : "No Jira projects were returned for this account.");
-  } catch (error) {
-    loadedProjects = [];
-    projectPickerGroup.classList.add("hidden");
-    generateActionGroup.classList.add("hidden");
-    projectEmptyState.classList.add("hidden");
-    setStatus(error.message, true);
-  }
-});
+loadProjectsButton.addEventListener("click", loadProjects);
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -732,7 +740,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   fetchConfig()
-    .then(applyManagedAuthUi)
+    .then((config) => {
+      applyManagedAuthUi(config);
+      if (config?.managedAuth) {
+        return loadProjects();
+      }
+      return null;
+    })
     .catch(() => {
       managedAuth = false;
     });
