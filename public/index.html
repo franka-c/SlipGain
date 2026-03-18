@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jira Slip Gain Report</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Jira Slip/Gain</p>
+          <h1>Generate the PM report without touching Excel.</h1>
+          <p class="lede">
+            Connect to Jira, pick a project, and reproduce the same epic-level slip/gain report directly in the browser.
+          </p>
+        </div>
+      </section>
+
+      <section class="card login-card">
+        <div class="section-head login-head">
+          <div>
+            <p class="eyebrow">Connect</p>
+            <h2>Jira Access</h2>
+          </div>
+          <p class="section-copy">Load available projects first, then generate the report once the project is selected.</p>
+        </div>
+        <form id="config-form" class="form-grid">
+          <label>
+            Jira Email
+            <input id="email" name="email" type="email" placeholder="pm@company.com" required />
+          </label>
+
+          <label>
+            Jira API Token
+            <input id="apiToken" name="apiToken" type="password" placeholder="Atlassian API token" required />
+          </label>
+
+          <div class="actions">
+            <button type="button" id="load-projects">Load Projects</button>
+          </div>
+
+          <label class="project-picker hidden" id="project-picker-group">
+            Project
+            <select id="projectKey" name="projectKey" required>
+              <option value="">Load projects first</option>
+            </select>
+          </label>
+
+          <p id="project-empty-state" class="inline-note hidden">No projects available for this Jira account.</p>
+
+          <div class="actions actions-wide hidden" id="generate-action-group">
+            <button type="submit" id="generate-report">Generate Report</button>
+          </div>
+        </form>
+
+        <div id="export-actions" class="export-actions hidden">
+          <button type="button" id="export-csv" class="secondary-button">Export CSV</button>
+          <button type="button" id="download-pdf" class="secondary-button">Download PDF</button>
+        </div>
+
+        <p id="status" class="status">Enter your Jira details to begin.</p>
+      </section>
+
+      <section class="card hidden input-focus-card" id="report-metadata-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Report Setup</p>
+            <h2>Workbook Inputs</h2>
+          </div>
+          <p class="section-copy">Fill these in after the initial report loads. The extra metrics update immediately.</p>
+        </div>
+
+        <form id="report-metadata-form" class="form-grid">
+          <label>
+            Project Title
+            <input id="projectTitle" name="projectTitle" placeholder="RightVybe" />
+          </label>
+
+          <label>
+            Report Creation Date
+            <input id="reportCreationDate" name="reportCreationDate" type="date" />
+          </label>
+
+          <label>
+            Project Start Date
+            <input id="projectStartDate" name="projectStartDate" type="date" />
+          </label>
+
+          <label>
+            Deadline
+            <input id="deadline" name="deadline" type="date" />
+          </label>
+
+          <label>
+            Time Spent Last Week
+            <input id="timeSpentLastWeek" name="timeSpentLastWeek" type="number" min="0" step="0.01" placeholder="0" />
+          </label>
+        </form>
+      </section>
+
+      <section id="summary-section" class="summary-grid hidden"></section>
+
+      <section class="card error-card hidden" id="error-section">
+        <div class="section-head error-head">
+          <div>
+            <p class="eyebrow">Issue</p>
+            <h2>Something went wrong</h2>
+          </div>
+          <button type="button" id="dismiss-error" class="secondary-button">Dismiss</button>
+        </div>
+        <p id="error-message" class="error-message"></p>
+        <p id="error-hint" class="section-copy hidden"></p>
+        <details id="error-details" class="error-details">
+          <summary>Show technical details</summary>
+          <pre id="debug-output" class="debug-output"></pre>
+        </details>
+      </section>
+
+      <section class="card hidden" id="report-section">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Issue Key</th>
+                <th>Summary</th>
+                <th>Original Estimate</th>
+                <th>Remaining Estimate</th>
+                <th>Time Spent</th>
+                <th>Slip/Gain</th>
+                <th>Progress</th>
+                <th>Progress Bar</th>
+              </tr>
+            </thead>
+            <tbody id="report-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+  </html>

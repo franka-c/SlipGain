@@ -1,0 +1,9 @@
+{
+  "name": "jira-slip-gain-report",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Jira slip/gain reporting app",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
