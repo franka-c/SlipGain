@@ -1,47 +1,55 @@
 # Jira Slip/Gain Report App
 
-This app reproduces the Excel report logic from `/Users/franka/Downloads/Slip_Gain template.xlsx` and fetches the source data directly from Jira.
+This app reproduces the Excel slip/gain workflow and can run locally or on Vercel.
 
-## What it does
-
-- Connects to Jira Cloud using your base URL, email, and API token.
-- Loads available Jira projects so a PM can choose one.
-- Fetches epics in that project.
-- Uses your custom epic field for `Remaining Estimate`.
-- Sums `Time Spent` from the child issues under each epic.
-- Calculates:
-  - `Slip/Gain = Original estimate - Remaining Estimate - Time Spent`
-  - `Progress = Time Spent / (Time Spent + Remaining Estimate)`
-- Shows report totals that match the workbook summary logic.
-- Exports the generated report as CSV.
-
-## Start
+## Local run
 
 ```bash
 npm start
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
-## Jira inputs you need
+Without environment variables, the UI will ask for Jira email and API token.
 
-- Jira base URL, for example `https://your-company.atlassian.net`
-- Jira user email
-- Jira API token
-- The custom field ID used for epic `Remaining Estimate`, for example `customfield_12345`
+## Environment variables
 
-## Assumptions
+Copy `.env.example` and provide:
 
-- `Original estimate` comes from Jira's `timeoriginalestimate` field on the epic and is converted from seconds to hours.
-- `Remaining Estimate` is stored on the epic in your custom field and is already expressed in hours.
-- Child issues are looked up using these JQL fallbacks:
+- `JIRA_BASE_URL`
+- `JIRA_EMAIL`
+- `JIRA_API_TOKEN`
+- `REMAINING_ESTIMATE_FIELD_ID`
+
+When `JIRA_EMAIL` and `JIRA_API_TOKEN` are set, the UI hides credential fields and uses managed auth automatically.
+
+## Vercel deploy
+
+1. Push this project to GitHub.
+2. Import the repository into Vercel.
+3. Add these environment variables in Vercel Project Settings:
+   - `JIRA_BASE_URL=https://decode.atlassian.net`
+   - `JIRA_EMAIL=...`
+   - `JIRA_API_TOKEN=...`
+   - `REMAINING_ESTIMATE_FIELD_ID=customfield_10822`
+4. Deploy.
+
+The frontend is served as static files and the backend runs through Vercel Functions:
+
+- `/api/config`
+- `/api/projects`
+- `/api/report`
+
+## Jira assumptions
+
+- `Original estimate` comes from Jira `timeoriginalestimate` on the epic and is converted from seconds to hours.
+- `Remaining Estimate` comes from `customfield_10822` unless overridden by env.
+- Child issues are looked up using:
   - `parentEpic = EPIC-123`
   - `"Epic Link" = EPIC-123`
   - `parent = EPIC-123`
 
-If your Jira setup uses a different way to link tasks to epics, that part may need adjustment.
-
 ## Notes
 
-- Credentials are sent only to the local Node server running on your machine. They are not stored.
-- This is a practical MVP. The next improvement would be adding saved configuration and generating a real `.xlsx` file instead of CSV.
+- CSV export includes both summary metrics and epic rows.
+- PDF export opens a print-ready view that you save as PDF from the browser.

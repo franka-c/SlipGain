@@ -24,15 +24,15 @@
             <p class="eyebrow">Connect</p>
             <h2>Jira Access</h2>
           </div>
-          <p class="section-copy">Load available projects first, then generate the report once the project is selected.</p>
+          <p id="login-copy" class="section-copy">Load available projects first, then generate the report once the project is selected.</p>
         </div>
         <form id="config-form" class="form-grid">
-          <label>
+          <label id="email-group">
             Jira Email
             <input id="email" name="email" type="email" placeholder="pm@company.com" required />
           </label>
 
-          <label>
+          <label id="token-group">
             Jira API Token
             <input id="apiToken" name="apiToken" type="password" placeholder="Atlassian API token" required />
           </label>

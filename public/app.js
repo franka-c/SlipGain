@@ -1,5 +1,8 @@
 const form = document.getElementById("config-form");
 const statusEl = document.getElementById("status");
+const loginCopy = document.getElementById("login-copy");
+const emailGroup = document.getElementById("email-group");
+const tokenGroup = document.getElementById("token-group");
 const projectPickerGroup = document.getElementById("project-picker-group");
 const generateActionGroup = document.getElementById("generate-action-group");
 const projectEmptyState = document.getElementById("project-empty-state");
@@ -24,6 +27,7 @@ let latestRows = [];
 let loadedProjects = [];
 let latestBaseSummary = null;
 let latestRenderedSummary = null;
+let managedAuth = false;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -55,6 +59,15 @@ async function postJson(url, payload) {
   }
 
   return data;
+}
+
+async function fetchConfig() {
+  const response = await fetch("/api/config");
+  if (!response.ok) {
+    return { managedAuth: false };
+  }
+
+  return response.json();
 }
 
 function formatHours(value) {
@@ -321,6 +334,26 @@ function renderProjectOptions(projects) {
     option.textContent = `${project.name} (${project.key})`;
     projectSelect.appendChild(option);
   }
+}
+
+function applyManagedAuthUi(config) {
+  managedAuth = Boolean(config?.managedAuth);
+
+  if (managedAuth) {
+    emailGroup.classList.add("hidden");
+    tokenGroup.classList.add("hidden");
+    document.getElementById("email").required = false;
+    document.getElementById("apiToken").required = false;
+    loginCopy.textContent =
+      "Jira credentials are managed by the deployment. Load projects first, then generate the report once the project is selected.";
+    statusEl.textContent = "Jira credentials are configured for this deployment.";
+    return;
+  }
+
+  emailGroup.classList.remove("hidden");
+  tokenGroup.classList.remove("hidden");
+  document.getElementById("email").required = true;
+  document.getElementById("apiToken").required = true;
 }
 
 function getSelectedProject() {
@@ -690,4 +723,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (reportCreationDateInput && !reportCreationDateInput.value) {
     reportCreationDateInput.value = today;
   }
+
+  fetchConfig()
+    .then(applyManagedAuthUi)
+    .catch(() => {
+      managedAuth = false;
+    });
 });
