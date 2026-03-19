@@ -3,8 +3,12 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const authCard = document.getElementById("auth-card");
 const appShell = document.getElementById("app-shell");
 const authStatusEl = document.getElementById("auth-status");
+const authCopy = document.getElementById("auth-copy");
+const authLayout = document.getElementById("auth-layout");
 const signupForm = document.getElementById("signup-form");
 const signinForm = document.getElementById("signin-form");
+const resetPasswordForm = document.getElementById("reset-password-form");
+const forgotPasswordButton = document.getElementById("forgot-password-button");
 const accountMenuWrap = document.getElementById("account-menu-wrap");
 const menuToggle = document.getElementById("menu-toggle");
 const menuPanel = document.getElementById("menu-panel");
@@ -78,6 +82,8 @@ let activeTrendView = "monthly";
 let currentUser = null;
 let approvedUsers = [];
 let pendingRequests = [];
+let passwordRecoveryMode = false;
+const defaultAuthCopy = authCopy?.textContent || "";
 
 function isAdminRoute() {
   return window.location.pathname === "/admin";
@@ -132,6 +138,45 @@ function setAuthStatus(message, isError = false) {
 function setAdminStatus(message, isError = false) {
   adminStatusEl.textContent = message;
   adminStatusEl.classList.toggle("error", isError);
+}
+
+function applyAuthModeUi() {
+  if (authLayout) {
+    authLayout.classList.toggle("hidden", passwordRecoveryMode);
+  }
+
+  if (resetPasswordForm) {
+    resetPasswordForm.classList.toggle("hidden", !passwordRecoveryMode);
+  }
+
+  if (authCopy) {
+    authCopy.textContent = passwordRecoveryMode
+      ? "Open the recovery email, follow the link, and set a new password here."
+      : defaultAuthCopy;
+  }
+}
+
+function hasRecoveryHash() {
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const params = new URLSearchParams(hash);
+  return params.get("type") === "recovery";
+}
+
+function clearRecoveryHash() {
+  const cleanUrl = `${window.location.pathname}${window.location.search}`;
+  window.history.replaceState({}, "", cleanUrl);
+}
+
+function setPasswordRecoveryMode(isRecovery) {
+  passwordRecoveryMode = isRecovery;
+  applyAuthModeUi();
+
+  if (!isRecovery) {
+    resetPasswordForm?.reset();
+    clearRecoveryHash();
+  }
 }
 
 function setButtonLoading(button, isLoading, loadingLabel) {
@@ -1547,6 +1592,17 @@ function downloadPdf() {
 async function updateAuthState(session) {
   accessToken = session?.access_token || null;
 
+  if (authEnabled && passwordRecoveryMode) {
+    currentUser = null;
+    authCard.classList.remove("hidden");
+    appShell.classList.add("hidden");
+    accountMenuWrap.classList.add("hidden");
+    adminSection.classList.add("hidden");
+    updateFilterMenuState();
+    closeMenu();
+    return;
+  }
+
   if (authEnabled && !session) {
     currentUser = null;
     authCard.classList.remove("hidden");
@@ -1690,6 +1746,67 @@ async function handleSignIn(event) {
   }
 }
 
+async function handleForgotPassword() {
+  if (!supabase) {
+    return;
+  }
+
+  const email = document.getElementById("signin-email").value.trim();
+
+  if (!email) {
+    setAuthStatus("Enter your work email first, then request a password reset.", true);
+    return;
+  }
+
+  if (!isAllowedEmail(email)) {
+    setAuthStatus(`Only @${allowedEmailDomain} email addresses are allowed.`, true);
+    return;
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+
+  if (error) {
+    setAuthStatus(error.message, true);
+    return;
+  }
+
+  setAuthStatus("Password reset email sent. Open the link from your inbox to set a new password.");
+}
+
+async function handleResetPassword(event) {
+  event.preventDefault();
+
+  if (!supabase) {
+    return;
+  }
+
+  const password = document.getElementById("reset-password").value;
+  const confirmPassword = document.getElementById("reset-password-confirm").value;
+
+  if (!password) {
+    setAuthStatus("Enter a new password.", true);
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    setAuthStatus("The password confirmation does not match.", true);
+    return;
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    setAuthStatus(error.message, true);
+    return;
+  }
+
+  setPasswordRecoveryMode(false);
+  await supabase.auth.signOut();
+  setAuthStatus("Password updated. Log in with your new password.");
+}
+
 loadProjectsButton.addEventListener("click", loadProjects);
 
 form.addEventListener("submit", async (event) => {
@@ -1792,6 +1909,8 @@ adminUserForm.addEventListener("submit", async (event) => {
 dismissErrorButton.addEventListener("click", hideError);
 signupForm.addEventListener("submit", handleSignUp);
 signinForm.addEventListener("submit", handleSignIn);
+resetPasswordForm.addEventListener("submit", handleResetPassword);
+forgotPasswordButton.addEventListener("click", handleForgotPassword);
 projectSelect.addEventListener("change", loadEpicFilters);
 partialFilterSection.addEventListener("change", (event) => {
   if (event.target.closest("#epic-options")) {
@@ -1901,6 +2020,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     const config = await fetchConfig();
     applyManagedAuthUi(config);
+    setPasswordRecoveryMode(hasRecoveryHash());
 
     if (config?.authEnabled && config.supabaseUrl && config.supabaseAnonKey) {
       supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
@@ -1908,7 +2028,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         data: { session },
       } = await supabase.auth.getSession();
       await updateAuthState(session);
-      supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      if (passwordRecoveryMode) {
+        setAuthStatus("Set a new password to finish resetting your account.");
+      }
+      supabase.auth.onAuthStateChange(async (event, nextSession) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setPasswordRecoveryMode(true);
+          setAuthStatus("Set a new password to finish resetting your account.");
+          await updateAuthState(nextSession);
+          return;
+        }
+
         await updateAuthState(nextSession);
       });
 

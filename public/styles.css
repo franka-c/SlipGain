@@ -181,6 +181,11 @@ h1 {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.auth-reset-form {
+  max-width: 560px;
+  margin-top: 18px;
+}
+
 .auth-form-head {
   grid-column: 1 / -1;
 }
@@ -200,6 +205,11 @@ h1 {
 .auth-emphasis {
   color: #2f6fd6;
   font-weight: 600;
+}
+
+.auth-link-button {
+  padding: 0;
+  justify-self: start;
 }
 
 .input-focus-card {
