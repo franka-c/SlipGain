@@ -594,6 +594,7 @@ function buildTrendChartMarkup(view = activeTrendView) {
   );
   const yMax = Math.max(10, Math.ceil(maxValue / 25) * 25);
   const yTicks = 5;
+  const xAxisY = height - margin.bottom;
 
   const pointsToPolyline = (key) =>
     series
@@ -659,7 +660,7 @@ function buildTrendChartMarkup(view = activeTrendView) {
   const xLabels = series
     .map(
       (point, index) => `
-        <text x="${xPosition(index)}" y="${height - 24}" text-anchor="middle" class="trend-axis-label trend-axis-label-x">${escapeHtml(point.label)}</text>
+        <text x="${xPosition(index)}" y="${xAxisY + 16}" text-anchor="middle" dominant-baseline="hanging" class="trend-axis-label trend-axis-label-x">${escapeHtml(point.label)}</text>
       `
     )
     .join("");
@@ -711,7 +712,7 @@ function buildTrendChartMarkup(view = activeTrendView) {
     <svg viewBox="0 0 ${width} ${height}" class="trend-svg" aria-label="Historical project workload chart">
       ${gridLines}
       <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="trend-axis-line" />
-      <line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" class="trend-axis-line" />
+      <line x1="${margin.left}" y1="${xAxisY}" x2="${width - margin.right}" y2="${xAxisY}" class="trend-axis-line" />
       ${lineDefs
         .map(
           (line) => `
