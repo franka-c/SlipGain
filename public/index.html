@@ -82,6 +82,7 @@
               <span class="menu-line"></span>
             </button>
             <div class="menu-panel hidden" id="menu-panel" role="menu">
+              <button type="button" id="admin-button" class="menu-item hidden" role="menuitem">Admin</button>
               <button type="button" id="adjust-filters-button" class="menu-item hidden" role="menuitem">Adjust Filters</button>
               <button type="button" id="logout-button" class="menu-item" role="menuitem">Log Out</button>
             </div>
@@ -248,6 +249,57 @@
           </div>
         </form>
         <div id="trend-chart" class="trend-chart"></div>
+      </section>
+
+      <section class="card hidden admin-card" id="admin-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Admin</p>
+            <h2>Approved Users</h2>
+          </div>
+          <p class="section-copy">Manage who can access the app and whether they are a regular user or an admin.</p>
+        </div>
+
+        <form id="admin-user-form" class="form-grid">
+          <label>
+            Email
+            <input id="admin-email" name="email" type="email" placeholder="name@decode.agency" />
+          </label>
+
+          <label>
+            Role
+            <select id="admin-role" name="role">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+
+          <label class="checkbox-label">
+            <span>Access Active</span>
+            <input id="admin-active" name="active" type="checkbox" checked />
+          </label>
+
+          <div class="actions">
+            <button type="submit" id="save-admin-user">Save User</button>
+          </div>
+        </form>
+
+        <p id="admin-status" class="status">Admin access is limited to approved admins.</p>
+
+        <div class="table-wrap admin-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Active</th>
+                <th>Approved By</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-body"></tbody>
+          </table>
+        </div>
       </section>
 
       <section id="summary-section" class="summary-grid hidden"></section>

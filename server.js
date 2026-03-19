@@ -3,7 +3,9 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const {
+  handleAdminUsers,
   handleConfig,
+  handleCurrentUser,
   handleEpics,
   handleProjects,
   handleReport,
@@ -47,6 +49,16 @@ function createServer() {
 
     if (req.method === "GET" && url.pathname === "/api/config") {
       handleConfig(req, res);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/me") {
+      handleCurrentUser(req, res);
+      return;
+    }
+
+    if ((req.method === "GET" || req.method === "POST") && url.pathname === "/api/admin/users") {
+      handleAdminUsers(req, res);
       return;
     }
 

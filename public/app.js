@@ -8,6 +8,7 @@ const signinForm = document.getElementById("signin-form");
 const accountMenuWrap = document.getElementById("account-menu-wrap");
 const menuToggle = document.getElementById("menu-toggle");
 const menuPanel = document.getElementById("menu-panel");
+const adminButton = document.getElementById("admin-button");
 const adjustFiltersButton = document.getElementById("adjust-filters-button");
 const logoutButton = document.getElementById("logout-button");
 
@@ -37,6 +38,10 @@ const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
 const trendControlsForm = document.getElementById("trend-controls-form");
 const loadTrendButton = document.getElementById("load-trend-button");
+const adminSection = document.getElementById("admin-section");
+const adminUserForm = document.getElementById("admin-user-form");
+const adminUsersBody = document.getElementById("admin-users-body");
+const adminStatusEl = document.getElementById("admin-status");
 const reportMetadataForm = document.getElementById("report-metadata-form");
 const reportBody = document.getElementById("report-body");
 const reportSection = document.getElementById("report-section");
@@ -59,12 +64,15 @@ let latestRenderedSummary = null;
 let latestTrendData = null;
 let managedAuth = false;
 let authEnabled = false;
+let approvalGateEnabled = false;
 let allowedEmailDomain = "decode.agency";
 let supabase = null;
 let accessToken = null;
 let latestEpicFilters = null;
 let selectedEpicKeysState = null;
 let activeTrendView = "monthly";
+let currentUser = null;
+let approvedUsers = [];
 
 function getTrendControlPayload() {
   const data = new FormData(trendControlsForm);
@@ -78,6 +86,7 @@ function closeMenu() {
 
 function updateFilterMenuState() {
   adjustFiltersButton.classList.toggle("hidden", !latestEpicFilters?.epics?.length);
+  adminButton.classList.toggle("hidden", currentUser?.role !== "admin");
 }
 
 function setStatus(message, isError = false) {
@@ -88,6 +97,11 @@ function setStatus(message, isError = false) {
 function setAuthStatus(message, isError = false) {
   authStatusEl.textContent = message;
   authStatusEl.classList.toggle("error", isError);
+}
+
+function setAdminStatus(message, isError = false) {
+  adminStatusEl.textContent = message;
+  adminStatusEl.classList.toggle("error", isError);
 }
 
 function getFormPayload() {
@@ -188,13 +202,20 @@ function isAllowedEmail(email) {
 }
 
 async function postJson(url, payload) {
-  const response = await fetch(url, {
+  return requestJson(url, {
     method: "POST",
+    payload,
+  });
+}
+
+async function requestJson(url, { method = "GET", payload } = {}) {
+  const response = await fetch(url, {
+    method,
     headers: {
-      "Content-Type": "application/json",
+      ...(payload ? { "Content-Type": "application/json" } : {}),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify(payload),
+    body: payload ? JSON.stringify(payload) : undefined,
   });
 
   const data = await response.json();
@@ -231,6 +252,66 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function renderApprovedUsersTable(users) {
+  adminUsersBody.innerHTML = users
+    .map(
+      (user) => `
+        <tr>
+          <td>${escapeHtml(user.email)}</td>
+          <td>${escapeHtml(user.role || "user")}</td>
+          <td>${user.active === false ? "No" : "Yes"}</td>
+          <td>${escapeHtml(user.approved_by || "Not set")}</td>
+          <td>
+            <button
+              type="button"
+              class="secondary-button admin-edit-button"
+              data-admin-email="${escapeHtml(user.email)}"
+            >
+              Edit
+            </button>
+          </td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function populateAdminForm(user) {
+  document.getElementById("admin-email").value = user?.email || "";
+  document.getElementById("admin-role").value = user?.role || "user";
+  document.getElementById("admin-active").checked = user?.active !== false;
+}
+
+async function loadCurrentUser() {
+  if (!authEnabled || !accessToken) {
+    currentUser = null;
+    updateFilterMenuState();
+    return null;
+  }
+
+  const data = await requestJson("/api/me");
+  currentUser = data.user || null;
+  updateFilterMenuState();
+  return currentUser;
+}
+
+async function loadApprovedUsers() {
+  const data = await requestJson("/api/admin/users");
+  approvedUsers = data.users || [];
+  renderApprovedUsersTable(approvedUsers);
+  return approvedUsers;
+}
+
+function openAdminSection() {
+  if (currentUser?.role !== "admin") {
+    return;
+  }
+
+  adminSection.classList.remove("hidden");
+  closeMenu();
+  adminSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function formatDate(value) {
@@ -725,6 +806,7 @@ function renderProjectOptions(projects) {
 function applyManagedAuthUi(config) {
   managedAuth = Boolean(config?.managedAuth);
   authEnabled = Boolean(config?.authEnabled);
+  approvalGateEnabled = Boolean(config?.approvalGateEnabled);
   allowedEmailDomain = config?.allowedEmailDomain || "decode.agency";
 
   if (managedAuth) {
@@ -1362,12 +1444,18 @@ async function updateAuthState(session) {
   accessToken = session?.access_token || null;
 
   if (authEnabled && !session) {
+    currentUser = null;
     authCard.classList.remove("hidden");
     appShell.classList.add("hidden");
     accountMenuWrap.classList.add("hidden");
+    adminSection.classList.add("hidden");
     updateFilterMenuState();
     closeMenu();
     return;
+  }
+
+  if (authEnabled && session) {
+    await loadCurrentUser();
   }
 
   authCard.classList.add("hidden");
@@ -1390,6 +1478,8 @@ async function handleLogout() {
   latestRows = [];
   latestBaseSummary = null;
   latestRenderedSummary = null;
+  currentUser = null;
+  approvedUsers = [];
   resetTrendData();
   loadedProjects = [];
   exportActions.classList.add("hidden");
@@ -1398,6 +1488,7 @@ async function handleLogout() {
   summarySection.classList.add("hidden");
   resetReportMetadata("");
   resetPartialFilters();
+  adminSection.classList.add("hidden");
   projectPickerGroup.classList.add("hidden");
   generateActionGroup.classList.add("hidden");
   projectEmptyState.classList.add("hidden");
@@ -1434,7 +1525,11 @@ async function handleSignUp(event) {
     return;
   }
 
-  setAuthStatus("Check your inbox and confirm your email before logging in.");
+  setAuthStatus(
+    approvalGateEnabled
+      ? "Check your inbox and confirm your email. You will also need to be approved before you can access the app."
+      : "Check your inbox and confirm your email before logging in."
+  );
 }
 
 async function handleSignIn(event) {
@@ -1463,9 +1558,16 @@ async function handleSignIn(event) {
   }
 
   setAuthStatus("Signed in.");
-  await updateAuthState(data.session);
-  if (managedAuth) {
-    await loadProjects();
+  try {
+    await updateAuthState(data.session);
+    if (managedAuth) {
+      await loadProjects();
+    }
+  } catch (authError) {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setAuthStatus(authError.message, true);
   }
 }
 
@@ -1516,6 +1618,16 @@ form.addEventListener("submit", async (event) => {
 });
 
 adjustFiltersButton.addEventListener("click", showPartialFilters);
+adminButton.addEventListener("click", async () => {
+  try {
+    setAdminStatus("Loading approved users...");
+    await loadApprovedUsers();
+    setAdminStatus("Approved users loaded.");
+    openAdminSection();
+  } catch (error) {
+    setAdminStatus(error.message, true);
+  }
+});
 exportButton.addEventListener("click", exportCsv);
 downloadPdfButton.addEventListener("click", downloadPdf);
 trendToggleButtons.forEach((button) => {
@@ -1539,6 +1651,23 @@ trendControlsForm.addEventListener("input", (event) => {
   }
 });
 loadTrendButton.addEventListener("click", loadTrendData);
+adminUserForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const email = document.getElementById("admin-email").value.trim();
+  const role = document.getElementById("admin-role").value;
+  const active = document.getElementById("admin-active").checked;
+
+  try {
+    setAdminStatus("Saving user...");
+    await postJson("/api/admin/users", { email, role, active });
+    await loadApprovedUsers();
+    populateAdminForm();
+    setAdminStatus("User saved.");
+  } catch (error) {
+    setAdminStatus(error.message, true);
+  }
+});
 dismissErrorButton.addEventListener("click", hideError);
 signupForm.addEventListener("submit", handleSignUp);
 signinForm.addEventListener("submit", handleSignIn);
@@ -1567,6 +1696,18 @@ clearAllEpicsButton.addEventListener("click", () => {
   }
   syncSelectedEpicKeysState();
   updateEpicSelectionCount();
+});
+adminUsersBody.addEventListener("click", (event) => {
+  const button = event.target.closest(".admin-edit-button");
+  if (!button) {
+    return;
+  }
+
+  const user = approvedUsers.find((entry) => entry.email === button.dataset.adminEmail);
+  if (user) {
+    populateAdminForm(user);
+    adminSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 });
 for (const button of document.querySelectorAll("[data-filter-clear]")) {
   button.addEventListener("click", () => {
