@@ -25,9 +25,7 @@ const projectSelect = document.getElementById("projectKey");
 const partialFilterSection = document.getElementById("partial-filter-section");
 const completionStateSelect = document.getElementById("completion-state");
 const statusOptions = document.getElementById("status-options");
-const milestoneOptions = document.getElementById("milestone-options");
 const labelOptions = document.getElementById("label-options");
-const sprintOptions = document.getElementById("sprint-options");
 const epicOptions = document.getElementById("epic-options");
 const epicSelectionCount = document.getElementById("epic-selection-count");
 const selectAllEpicsButton = document.getElementById("select-all-epics");
@@ -479,9 +477,7 @@ function resetPartialFilters() {
   partialFilterSection.classList.add("hidden");
   completionStateSelect.value = "all";
   statusOptions.innerHTML = "";
-  milestoneOptions.innerHTML = "";
   labelOptions.innerHTML = "";
-  sprintOptions.innerHTML = "";
   epicOptions.innerHTML = "";
   epicSelectionCount.textContent = "All loaded epics are currently included.";
 }
@@ -496,21 +492,9 @@ function renderPartialFilters(epicPayload) {
     new Set()
   );
   renderCheckboxOptions(
-    milestoneOptions,
-    epicPayload.filters.milestones,
-    "milestone",
-    new Set()
-  );
-  renderCheckboxOptions(
     labelOptions,
     epicPayload.filters.labels,
     "label",
-    new Set()
-  );
-  renderCheckboxOptions(
-    sprintOptions,
-    epicPayload.filters.sprints,
-    "sprint",
     new Set()
   );
   epicOptions.innerHTML = "";
@@ -540,9 +524,7 @@ function getReportFilters() {
     completionState: completionStateSelect.value || "all",
     selectedEpicKeys: getSelectedEpicKeys(),
     statuses: getCheckedValues("status"),
-    milestones: getCheckedValues("milestone"),
     labels: getCheckedValues("label"),
-    sprints: getCheckedValues("sprint"),
   };
 }
 
@@ -1032,9 +1014,7 @@ for (const button of document.querySelectorAll("[data-filter-clear]")) {
     const filterKind = button.dataset.filterClear;
     const map = {
       status: "status",
-      milestone: "milestone",
       label: "label",
-      sprint: "sprint",
     };
     const checkboxKind = map[filterKind];
     if (!checkboxKind) {

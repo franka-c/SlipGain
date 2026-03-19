@@ -366,13 +366,21 @@ button:disabled {
 
 .partial-filter-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 0.9fr 1.1fr;
   gap: 18px;
+  align-items: start;
 }
 
 .filter-group {
   display: grid;
   gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(11, 108, 240, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.partial-filter-layout > label {
   padding: 16px;
   border: 1px solid rgba(11, 108, 240, 0.12);
   border-radius: 18px;
@@ -418,24 +426,32 @@ button:disabled {
 
 .epic-picker-group {
   grid-column: 1 / -1;
+  gap: 14px;
 }
 
 .epic-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   max-height: 320px;
   overflow: auto;
   padding-right: 6px;
 }
 
 .filter-option {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid rgba(29, 35, 43, 0.08);
-  border-radius: 999px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.88);
   font-size: 0.92rem;
   font-weight: 600;
+}
+
+.epic-options .filter-option {
+  min-height: 56px;
 }
 
 .filter-option input {
@@ -710,6 +726,10 @@ td:nth-child(2) {
   .form-grid,
   .summary-grid,
   .partial-filter-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .epic-options {
     grid-template-columns: 1fr;
   }
 
