@@ -197,8 +197,8 @@ h1 {
 }
 
 .auth-emphasis {
-  color: var(--accent);
-  font-weight: 800;
+  color: #2f6fd6;
+  font-weight: 600;
 }
 
 .input-focus-card {
