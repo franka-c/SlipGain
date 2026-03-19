@@ -478,28 +478,42 @@ function updateEpicSelectionCount() {
   epicSelectionCount.textContent = `${selected} of ${total} epics are currently included.`;
 }
 
+function matchesCompletionState(epic, completionState) {
+  if (completionState === "completed") {
+    return epic.completed;
+  }
+
+  if (completionState === "incomplete") {
+    return !epic.completed;
+  }
+
+  return false;
+}
+
 function epicMatchesAutoFilters(epic, filters) {
   const statuses = filters.statuses || [];
   const labels = filters.labels || [];
   const completionState = filters.completionState || "all";
 
-  if (statuses.length > 0 && !statuses.includes(epic.status)) {
-    return false;
+  const activeAutoMatches = [];
+
+  if (statuses.length > 0) {
+    activeAutoMatches.push(statuses.includes(epic.status));
   }
 
-  if (labels.length > 0 && !labels.some((label) => epic.labels.includes(label))) {
-    return false;
+  if (labels.length > 0) {
+    activeAutoMatches.push(labels.some((label) => epic.labels.includes(label)));
   }
 
-  if (completionState === "completed" && !epic.completed) {
-    return false;
+  if (completionState !== "all") {
+    activeAutoMatches.push(matchesCompletionState(epic, completionState));
   }
 
-  if (completionState === "incomplete" && epic.completed) {
-    return false;
+  if (activeAutoMatches.length === 0) {
+    return true;
   }
 
-  return true;
+  return activeAutoMatches.some(Boolean);
 }
 
 function getAutoFilterValues() {
