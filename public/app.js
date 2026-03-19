@@ -1664,6 +1664,7 @@ async function handleSignIn(event) {
   setAuthStatus("Signed in.");
   try {
     await updateAuthState(data.session);
+    navigateTo("/");
     if (managedAuth) {
       await loadProjects();
     }
