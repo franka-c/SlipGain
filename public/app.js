@@ -64,7 +64,7 @@ let supabase = null;
 let accessToken = null;
 let latestEpicFilters = null;
 let selectedEpicKeysState = null;
-let activeTrendView = "weekly";
+let activeTrendView = "monthly";
 
 function getTrendControlPayload() {
   const data = new FormData(trendControlsForm);
@@ -846,11 +846,11 @@ function resetPartialFilters() {
 
 function resetTrendData() {
   latestTrendData = null;
-  activeTrendView = "weekly";
+  activeTrendView = "monthly";
   trendChart.innerHTML = "";
   trendSection.classList.add("hidden");
   trendToggleButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.trendView === "weekly");
+    button.classList.toggle("active", button.dataset.trendView === "monthly");
   });
   loadTrendButton.disabled = false;
 }
