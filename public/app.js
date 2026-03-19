@@ -100,6 +100,47 @@ function getMetadataPayload() {
   return Object.fromEntries(data.entries());
 }
 
+function resetReportMetadata(projectName = "") {
+  const today = new Date().toISOString().slice(0, 10);
+  const projectTitleInput = document.getElementById("projectTitle");
+  const reportCreationDateInput = document.getElementById("reportCreationDate");
+  const projectStartDateInput = document.getElementById("projectStartDate");
+  const deadlineInput = document.getElementById("deadline");
+  const timeSpentLastWeekInput = document.getElementById("timeSpentLastWeek");
+  const trendStartDateInput = document.getElementById("trendStartDate");
+  const trendEndDateInput = document.getElementById("trendEndDate");
+
+  if (projectTitleInput) {
+    projectTitleInput.value = projectName;
+  }
+
+  if (reportCreationDateInput) {
+    reportCreationDateInput.value = today;
+  }
+
+  if (projectStartDateInput) {
+    projectStartDateInput.value = "";
+  }
+
+  if (deadlineInput) {
+    deadlineInput.value = "";
+  }
+
+  if (timeSpentLastWeekInput) {
+    timeSpentLastWeekInput.value = "";
+  }
+
+  if (trendStartDateInput) {
+    trendStartDateInput.value = "";
+    delete trendStartDateInput.dataset.userSet;
+  }
+
+  if (trendEndDateInput) {
+    trendEndDateInput.value = today;
+    delete trendEndDateInput.dataset.userSet;
+  }
+}
+
 function isAllowedEmail(email) {
   return String(email || "").toLowerCase().endsWith(`@${allowedEmailDomain}`);
 }
@@ -941,8 +982,10 @@ function getReportFilters() {
 async function loadEpicFilters() {
   const payload = getFormPayload();
   const { projectKey } = payload;
+  const selectedProject = getSelectedProject();
 
   resetPartialFilters();
+  resetReportMetadata(selectedProject?.name || "");
   latestRows = [];
   latestBaseSummary = null;
   latestRenderedSummary = null;
@@ -1311,6 +1354,7 @@ async function handleLogout() {
   reportMetadataSection.classList.add("hidden");
   reportSection.classList.add("hidden");
   summarySection.classList.add("hidden");
+  resetReportMetadata("");
   resetPartialFilters();
   projectPickerGroup.classList.add("hidden");
   generateActionGroup.classList.add("hidden");
