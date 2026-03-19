@@ -141,6 +141,48 @@ function resetReportMetadata(projectName = "") {
   }
 }
 
+function resetConfigInputs() {
+  const emailInput = document.getElementById("email");
+  const apiTokenInput = document.getElementById("apiToken");
+
+  if (emailInput) {
+    emailInput.value = "";
+  }
+
+  if (apiTokenInput) {
+    apiTokenInput.value = "";
+  }
+}
+
+function resetAuthInputs() {
+  const signupEmailInput = document.getElementById("signup-email");
+  const signupPasswordInput = document.getElementById("signup-password");
+  const signinEmailInput = document.getElementById("signin-email");
+  const signinPasswordInput = document.getElementById("signin-password");
+
+  if (signupEmailInput) {
+    signupEmailInput.value = "";
+  }
+
+  if (signupPasswordInput) {
+    signupPasswordInput.value = "";
+  }
+
+  if (signinEmailInput) {
+    signinEmailInput.value = "";
+  }
+
+  if (signinPasswordInput) {
+    signinPasswordInput.value = "";
+  }
+}
+
+function resetAllEditableInputs() {
+  resetAuthInputs();
+  resetConfigInputs();
+  resetReportMetadata("");
+}
+
 function isAllowedEmail(email) {
   return String(email || "").toLowerCase().endsWith(`@${allowedEmailDomain}`);
 }
@@ -1561,7 +1603,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const today = new Date().toISOString().slice(0, 10);
   const reportCreationDateInput = document.getElementById("reportCreationDate");
 
-  resetReportMetadata("");
+  resetAllEditableInputs();
 
   if (reportCreationDateInput && !reportCreationDateInput.value) {
     reportCreationDateInput.value = today;
@@ -1593,5 +1635,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   } catch {
     await updateAuthState(null);
+  }
+});
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    resetAllEditableInputs();
   }
 });
