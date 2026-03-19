@@ -8,6 +8,7 @@ const signinForm = document.getElementById("signin-form");
 const accountMenuWrap = document.getElementById("account-menu-wrap");
 const menuToggle = document.getElementById("menu-toggle");
 const menuPanel = document.getElementById("menu-panel");
+const adjustFiltersButton = document.getElementById("adjust-filters-button");
 const logoutButton = document.getElementById("logout-button");
 
 const form = document.getElementById("config-form");
@@ -61,6 +62,10 @@ let selectedEpicKeysState = null;
 function closeMenu() {
   menuPanel.classList.add("hidden");
   menuToggle.setAttribute("aria-expanded", "false");
+}
+
+function updateFilterMenuState() {
+  adjustFiltersButton.classList.toggle("hidden", !latestEpicFilters?.epics?.length);
 }
 
 function setStatus(message, isError = false) {
@@ -568,6 +573,7 @@ function resetPartialFilters() {
   labelOptions.innerHTML = "";
   epicOptions.innerHTML = "";
   epicSelectionCount.textContent = "All loaded epics are currently included.";
+  updateFilterMenuState();
 }
 
 function renderPartialFilters(epicPayload) {
@@ -588,6 +594,17 @@ function renderPartialFilters(epicPayload) {
   );
   renderEpicOptions();
   partialFilterSection.classList.toggle("hidden", epicPayload.epics.length === 0);
+  updateFilterMenuState();
+}
+
+function showPartialFilters() {
+  if (!latestEpicFilters?.epics?.length) {
+    return;
+  }
+
+  partialFilterSection.classList.remove("hidden");
+  closeMenu();
+  partialFilterSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function getSelectedEpicKeys() {
@@ -917,6 +934,7 @@ async function updateAuthState(session) {
     authCard.classList.remove("hidden");
     appShell.classList.add("hidden");
     accountMenuWrap.classList.add("hidden");
+    updateFilterMenuState();
     closeMenu();
     return;
   }
@@ -924,6 +942,7 @@ async function updateAuthState(session) {
   authCard.classList.add("hidden");
   appShell.classList.remove("hidden");
   accountMenuWrap.classList.toggle("hidden", !(authEnabled && session));
+  updateFilterMenuState();
 }
 
 async function handleLogout() {
@@ -1046,6 +1065,7 @@ form.addEventListener("submit", async (event) => {
     reportMetadataSection.classList.remove("hidden");
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
     renderRows(data.rows);
+    partialFilterSection.classList.add("hidden");
     exportActions.classList.toggle("hidden", data.rows.length === 0);
     exportButton.disabled = data.rows.length === 0;
     downloadPdfButton.disabled = data.rows.length === 0;
@@ -1059,6 +1079,7 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+adjustFiltersButton.addEventListener("click", showPartialFilters);
 exportButton.addEventListener("click", exportCsv);
 downloadPdfButton.addEventListener("click", downloadPdf);
 reportMetadataForm.addEventListener("input", () => {
