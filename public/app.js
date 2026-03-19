@@ -283,13 +283,14 @@ function syncTrendDateDefaults() {
   const trendControls = getTrendControlPayload();
   const trendStartDateInput = document.getElementById("trendStartDate");
   const trendEndDateInput = document.getElementById("trendEndDate");
+  const today = new Date().toISOString().slice(0, 10);
 
   if (trendStartDateInput && (!trendControls.trendStartDate || !trendStartDateInput.dataset.userSet)) {
     trendStartDateInput.value = metadata.projectStartDate || "";
   }
 
   if (trendEndDateInput && (!trendControls.trendEndDate || !trendEndDateInput.dataset.userSet)) {
-    trendEndDateInput.value = metadata.deadline || "";
+    trendEndDateInput.value = today;
   }
 }
 
