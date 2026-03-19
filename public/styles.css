@@ -50,7 +50,7 @@ body {
 
 .menu-toggle {
   width: 120px;
-  height: 56px;
+  height: 64px;
   padding: 0 16px;
   display: flex;
   align-items: center;
@@ -65,14 +65,16 @@ body {
 
 .menu-brand {
   position: absolute;
-  inset: 0;
+  top: 12px;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.24em;
-  color: rgba(29, 35, 43, 0.18);
+  color: rgba(29, 35, 43, 1);
   pointer-events: none;
 }
 
@@ -88,15 +90,15 @@ body {
 }
 
 .menu-line:nth-of-type(2) {
-  top: 18px;
+  top: 36px;
 }
 
 .menu-line:nth-of-type(3) {
-  top: 26px;
+  top: 44px;
 }
 
 .menu-line:nth-of-type(4) {
-  top: 34px;
+  top: 52px;
 }
 
 .menu-panel {
