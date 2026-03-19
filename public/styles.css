@@ -413,11 +413,6 @@ h1 {
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
-.trend-axis-label-x {
-  transform: rotate(-40deg);
-  transform-origin: center;
-}
-
 .trend-axis-title {
   fill: var(--muted);
   font-size: 14px;

@@ -660,7 +660,14 @@ function buildTrendChartMarkup(view = activeTrendView) {
   const xLabels = series
     .map(
       (point, index) => `
-        <text x="${xPosition(index)}" y="${xAxisY + 16}" text-anchor="middle" dominant-baseline="hanging" class="trend-axis-label trend-axis-label-x">${escapeHtml(point.label)}</text>
+        <text
+          x="${xPosition(index)}"
+          y="${xAxisY + 12}"
+          text-anchor="start"
+          dominant-baseline="hanging"
+          transform="rotate(-40 ${xPosition(index)} ${xAxisY + 12})"
+          class="trend-axis-label trend-axis-label-x"
+        >${escapeHtml(point.label)}</text>
       `
     )
     .join("");
@@ -1434,7 +1441,6 @@ function downloadPdf() {
           .trend-grid-line { stroke: rgba(90, 100, 114, 0.22); stroke-dasharray: 5 5; }
           .trend-axis-line { stroke: rgba(29, 35, 43, 0.24); stroke-width: 1.4; }
           .trend-axis-label { fill: #5a6472; font-size: 13px; font-family: "Avenir Next", "Segoe UI", sans-serif; }
-          .trend-axis-label-x { transform: rotate(-40deg); transform-origin: center; }
           .trend-axis-title { fill: #5a6472; font-size: 14px; font-weight: 700; font-family: "Avenir Next", "Segoe UI", sans-serif; }
           .slip-table { width: 100%; border-collapse: collapse; font-size: 14px; }
           .slip-table th, .slip-table td { border-bottom: 1px solid #e5e8ee; padding: 8px 10px; text-align: left; vertical-align: top; }
