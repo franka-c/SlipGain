@@ -196,16 +196,9 @@ h1 {
   line-height: 1.5;
 }
 
-.auth-note {
-  margin: 4px 0 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(11, 108, 240, 0.08);
-  border: 1px solid rgba(11, 108, 240, 0.12);
-  color: var(--text);
-  font-size: 0.95rem;
-  line-height: 1.5;
-  font-weight: 600;
+.auth-emphasis {
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .input-focus-card {
