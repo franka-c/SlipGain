@@ -662,10 +662,10 @@ function buildTrendChartMarkup(view = activeTrendView) {
       (point, index) => `
         <text
           x="${xPosition(index)}"
-          y="${xAxisY + 6}"
+          y="${xAxisY + 14}"
           text-anchor="start"
           dominant-baseline="hanging"
-          transform="rotate(-40 ${xPosition(index)} ${xAxisY + 6})"
+          transform="rotate(-40 ${xPosition(index)} ${xAxisY + 14})"
           class="trend-axis-label trend-axis-label-x"
         >${escapeHtml(point.label)}</text>
       `
