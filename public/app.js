@@ -134,6 +134,20 @@ function setAdminStatus(message, isError = false) {
   adminStatusEl.classList.toggle("error", isError);
 }
 
+function setButtonLoading(button, isLoading, loadingLabel) {
+  if (!button) {
+    return;
+  }
+
+  if (!button.dataset.defaultLabel) {
+    button.dataset.defaultLabel = button.textContent.trim();
+  }
+
+  button.disabled = isLoading;
+  button.classList.toggle("button-loading", isLoading);
+  button.textContent = isLoading ? loadingLabel : button.dataset.defaultLabel;
+}
+
 function getFormPayload() {
   const data = new FormData(form);
   return Object.fromEntries(data.entries());
@@ -1119,7 +1133,7 @@ async function loadTrendData() {
     return;
   }
 
-  loadTrendButton.disabled = true;
+  setButtonLoading(loadTrendButton, true, "Loading graph...");
   setStatus("Loading historical graph...");
 
   try {
@@ -1144,7 +1158,7 @@ async function loadTrendData() {
     renderError(error.payload, error.message);
     setStatus(error.message, true);
   } finally {
-    loadTrendButton.disabled = false;
+    setButtonLoading(loadTrendButton, false);
   }
 }
 
