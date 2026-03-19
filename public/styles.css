@@ -37,8 +37,8 @@ body {
 }
 
 .hero-topbar {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
   gap: 20px;
 }
@@ -608,11 +608,8 @@ td:nth-child(2) {
 
 @media (max-width: 900px) {
   .hero-topbar {
-    flex-direction: column;
-  }
-
-  .menu-wrap {
-    align-self: flex-end;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
   }
 
   .auth-layout,
