@@ -524,6 +524,14 @@ function getAutoFilterValues() {
   };
 }
 
+function hasActiveAutoFilters(filters) {
+  return (
+    filters.completionState !== "all" ||
+    filters.statuses.length > 0 ||
+    filters.labels.length > 0
+  );
+}
+
 function syncSelectedEpicKeysState() {
   selectedEpicKeysState = new Set(
     Array.from(epicOptions.querySelectorAll('input[type="checkbox"]:checked'))
@@ -545,6 +553,10 @@ function renderEpicOptions() {
   const visibleEpics = latestEpicFilters.epics.filter((epic) =>
     epicMatchesAutoFilters(epic, autoFilters)
   );
+
+  if (!hasActiveAutoFilters(autoFilters)) {
+    selectedEpicKeysState = null;
+  }
 
   if (visibleEpics.length === 0) {
     epicOptions.innerHTML =
