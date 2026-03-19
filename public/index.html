@@ -17,7 +17,7 @@
           <p id="auth-copy" class="section-copy">Use your `@decode.agency` email to create an account, confirm it from the email link in your inbox, and then sign in.</p>
         </div>
 
-        <div class="auth-layout">
+        <div class="auth-layout" id="auth-layout">
           <form id="signup-form" class="form-grid auth-form">
             <div class="auth-form-head">
               <h3>Create account</h3>
@@ -58,8 +58,33 @@
             <div class="actions actions-wide">
               <button type="submit" id="signin-button">Log In</button>
             </div>
+
+            <div class="actions actions-wide">
+              <button type="button" id="forgot-password-button" class="mini-action auth-link-button">Forgot password?</button>
+            </div>
           </form>
         </div>
+
+        <form id="reset-password-form" class="form-grid auth-form hidden auth-reset-form">
+          <div class="auth-form-head">
+            <h3>Reset password</h3>
+            <p>Enter a new password to finish the recovery flow from your email link.</p>
+          </div>
+
+          <label>
+            New Password
+            <input id="reset-password" name="resetPassword" type="password" placeholder="Enter a new password" />
+          </label>
+
+          <label>
+            Confirm New Password
+            <input id="reset-password-confirm" name="resetPasswordConfirm" type="password" placeholder="Repeat your new password" />
+          </label>
+
+          <div class="actions actions-wide">
+            <button type="submit" id="reset-password-submit">Save New Password</button>
+          </div>
+        </form>
 
         <p id="auth-status" class="status">Authentication is required for this deployment.</p>
       </section>
