@@ -247,17 +247,51 @@ function getTrendSeries(view = activeTrendView) {
   return latestTrendData?.[view] || [];
 }
 
+function pointHasAnyTrendValue(point) {
+  return (
+    Number(point.cumulativeOriginalEstimate) > 0 ||
+    Number(point.cumulativeTimeSpent) > 0 ||
+    Number(point.remainingEstimate) > 0 ||
+    Number(point.totalWork) > 0
+  );
+}
+
+function getVisibleTrendSeries(view = activeTrendView) {
+  const series = getTrendSeries(view);
+
+  if (!series.length) {
+    return [];
+  }
+
+  const metadata = getMetadataPayload();
+  const projectStartDate = parseDateInput(metadata.projectStartDate);
+
+  if (projectStartDate) {
+    const trimmed = series.filter((point) => {
+      const pointDate = parseDateInput(point.date);
+      return pointDate && pointDate >= projectStartDate;
+    });
+
+    return trimmed.length > 0 ? trimmed : [series[series.length - 1]];
+  }
+
+  const firstNonZeroIndex = series.findIndex(pointHasAnyTrendValue);
+  if (firstNonZeroIndex === -1) {
+    return series;
+  }
+
+  return series.slice(firstNonZeroIndex);
+}
+
 function formatTrendTooltipValue(value) {
   return `${formatHours(value)}h`;
 }
 
-function renderTrendChart() {
-  const series = getTrendSeries();
+function buildTrendChartMarkup(view = activeTrendView) {
+  const series = getVisibleTrendSeries(view);
 
   if (!series.length) {
-    trendChart.innerHTML = '<p class="filter-empty">No historical trend data is available for this selection.</p>';
-    trendSection.classList.add("hidden");
-    return;
+    return "";
   }
 
   const width = 1040;
@@ -377,7 +411,7 @@ function renderTrendChart() {
     )
     .join("");
 
-  trendChart.innerHTML = `
+  return `
     <div class="trend-legend">
       ${lineDefs
         .map(
@@ -412,6 +446,18 @@ function renderTrendChart() {
       <text x="${margin.left - 48}" y="${margin.top - 6}" class="trend-axis-title">Hours</text>
     </svg>
   `;
+}
+
+function renderTrendChart() {
+  const markup = buildTrendChartMarkup();
+
+  if (!markup) {
+    trendChart.innerHTML = '<p class="filter-empty">No historical trend data is available for this selection.</p>';
+    trendSection.classList.add("hidden");
+    return;
+  }
+
+  trendChart.innerHTML = markup;
 
   trendSection.classList.remove("hidden");
   trendToggleButtons.forEach((button) => {
@@ -1001,6 +1047,8 @@ function downloadPdf() {
   }
 
   const summary = latestRenderedSummary;
+  const trendMarkup = buildTrendChartMarkup(activeTrendView);
+  const trendViewLabel = activeTrendView === "monthly" ? "Monthly view" : "Weekly view";
   const slipGainItems = [
     ["Slip/gain all included", formatHours(summary.slipGainAllIncluded), formatPercent(summary.slipGainAllIncludedPct)],
     ["Slip/gain without unestimated work", formatHours(summary.slipGainWithoutUnestimated), formatPercent(summary.slipGainWithoutUnestimatedPct)],
@@ -1050,6 +1098,18 @@ function downloadPdf() {
           .meta-grid, .metric-grid { display: grid; gap: 10px; }
           .meta-item, .metric-item { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
           .metric-item strong, .meta-item strong { font-size: 14px; }
+          .trend-shell { display: grid; gap: 14px; }
+          .trend-copy { margin-top: 4px; color: #5a6472; font-size: 13px; }
+          .trend-legend { display: flex; flex-wrap: wrap; gap: 12px 16px; margin-bottom: 10px; }
+          .trend-legend-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+          .trend-legend-swatch { width: 28px; height: 0; border-top: 3px solid var(--swatch); border-radius: 999px; position: relative; }
+          .trend-legend-swatch::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--swatch); position: absolute; right: -1px; top: -5px; }
+          .trend-svg { width: 100%; height: auto; display: block; }
+          .trend-grid-line { stroke: rgba(90, 100, 114, 0.22); stroke-dasharray: 5 5; }
+          .trend-axis-line { stroke: rgba(29, 35, 43, 0.24); stroke-width: 1.4; }
+          .trend-axis-label { fill: #5a6472; font-size: 13px; font-family: "Avenir Next", "Segoe UI", sans-serif; }
+          .trend-axis-label-x { transform: rotate(-40deg); transform-origin: center; }
+          .trend-axis-title { fill: #5a6472; font-size: 14px; font-weight: 700; font-family: "Avenir Next", "Segoe UI", sans-serif; }
           .slip-table { width: 100%; border-collapse: collapse; font-size: 14px; }
           .slip-table th, .slip-table td { border-bottom: 1px solid #e5e8ee; padding: 8px 10px; text-align: left; vertical-align: top; }
           .slip-table th { color: #5a6472; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -1104,6 +1164,19 @@ function downloadPdf() {
               </div>
             </div>
           </section>
+          ${
+            trendMarkup
+              ? `
+                <section class="card trend-shell">
+                  <div>
+                    <h2>Workload Trend</h2>
+                    <p class="trend-copy">${escapeHtml(trendViewLabel)}. Cumulative original estimate, logged time, remaining estimate, and total work for the included epics.</p>
+                  </div>
+                  <div>${trendMarkup}</div>
+                </section>
+              `
+              : ""
+          }
           <section class="card">
             <h2>Epic Breakdown</h2>
             <table class="slip-table">
@@ -1312,6 +1385,7 @@ trendToggleButtons.forEach((button) => {
 });
 reportMetadataForm.addEventListener("input", () => {
   renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
+  renderTrendChart();
 });
 dismissErrorButton.addEventListener("click", hideError);
 signupForm.addEventListener("submit", handleSignUp);
