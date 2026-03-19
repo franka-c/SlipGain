@@ -43,6 +43,7 @@ const loadTrendButton = document.getElementById("load-trend-button");
 const adminSection = document.getElementById("admin-section");
 const backToReportButton = document.getElementById("back-to-report");
 const adminUserForm = document.getElementById("admin-user-form");
+const adminRequestsBody = document.getElementById("admin-requests-body");
 const adminUsersBody = document.getElementById("admin-users-body");
 const adminStatusEl = document.getElementById("admin-status");
 const reportMetadataForm = document.getElementById("report-metadata-form");
@@ -76,6 +77,7 @@ let selectedEpicKeysState = null;
 let activeTrendView = "monthly";
 let currentUser = null;
 let approvedUsers = [];
+let pendingRequests = [];
 
 function isAdminRoute() {
   return window.location.pathname === "/admin";
@@ -305,6 +307,33 @@ function renderApprovedUsersTable(users) {
     .join("");
 }
 
+function renderPendingRequestsTable(requests) {
+  adminRequestsBody.innerHTML = requests
+    .map(
+      (request) => `
+        <tr>
+          <td>${escapeHtml(request.email)}</td>
+          <td>${escapeHtml(request.status || "pending")}</td>
+          <td>${escapeHtml(request.requested_at || "")}</td>
+          <td>
+            ${
+              request.status === "pending"
+                ? `<button
+                    type="button"
+                    class="secondary-button admin-approve-button"
+                    data-request-email="${escapeHtml(request.email)}"
+                  >
+                    Approve
+                  </button>`
+                : ""
+            }
+          </td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
 function populateAdminForm(user) {
   document.getElementById("admin-email").value = user?.email || "";
   document.getElementById("admin-role").value = user?.role || "user";
@@ -327,7 +356,9 @@ async function loadCurrentUser() {
 async function loadApprovedUsers() {
   const data = await requestJson("/api/admin/users");
   approvedUsers = data.users || [];
+  pendingRequests = data.requests || [];
   renderApprovedUsersTable(approvedUsers);
+  renderPendingRequestsTable(pendingRequests);
   return approvedUsers;
 }
 
@@ -1588,6 +1619,15 @@ async function handleSignUp(event) {
     return;
   }
 
+  if (approvalGateEnabled) {
+    try {
+      await postJson("/api/access-request", { email });
+    } catch (requestError) {
+      setAuthStatus(requestError.message, true);
+      return;
+    }
+  }
+
   setAuthStatus(
     approvalGateEnabled
       ? "Check your inbox and confirm your email. You will also need to be approved before you can access the app."
@@ -1772,6 +1812,31 @@ adminUsersBody.addEventListener("click", (event) => {
   if (user) {
     populateAdminForm(user);
     adminSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
+adminRequestsBody.addEventListener("click", async (event) => {
+  const button = event.target.closest(".admin-approve-button");
+  if (!button) {
+    return;
+  }
+
+  const email = button.dataset.requestEmail;
+  if (!email) {
+    return;
+  }
+
+  try {
+    setAdminStatus("Approving request...");
+    await postJson("/api/admin/users", {
+      action: "approve-request",
+      email,
+      role: "user",
+      active: true,
+    });
+    await loadApprovedUsers();
+    setAdminStatus("Request approved.");
+  } catch (error) {
+    setAdminStatus(error.message, true);
   }
 });
 for (const button of document.querySelectorAll("[data-filter-clear]")) {

@@ -82,6 +82,27 @@ When `SUPABASE_SERVICE_ROLE_KEY` is configured, the app will:
 - deny access if `active = false`
 - use `role = 'admin'` to unlock the admin screen
 
+### Pending access requests
+
+If you want sign-ups to appear in the admin screen as pending requests before approval, also create this table in Supabase:
+
+```sql
+create table public.access_requests (
+  email text primary key,
+  status text not null default 'pending',
+  requested_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by text
+);
+```
+
+With both `approved_users` and `access_requests` in place:
+
+- a new sign-up creates or refreshes a `pending` access request
+- admins can review pending requests on `/admin`
+- approving a request adds the user to `approved_users`
+- the request is marked as `approved` with reviewer metadata
+
 ## Vercel deploy
 
 1. Push this project to GitHub.

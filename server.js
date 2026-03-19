@@ -4,6 +4,7 @@ const path = require("path");
 const { URL } = require("url");
 const {
   handleAdminUsers,
+  handleAccessRequest,
   handleConfig,
   handleCurrentUser,
   handleEpics,
@@ -54,6 +55,11 @@ function createServer() {
 
     if (req.method === "GET" && url.pathname === "/api/me") {
       handleCurrentUser(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/access-request") {
+      handleAccessRequest(req, res);
       return;
     }
 
