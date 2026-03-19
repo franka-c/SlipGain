@@ -2,7 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
-const { handleConfig, handleProjects, handleReport } = require("./lib/jira");
+const {
+  handleConfig,
+  handleEpics,
+  handleProjects,
+  handleReport,
+} = require("./lib/jira");
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -46,6 +51,11 @@ function createServer() {
 
     if (req.method === "POST" && url.pathname === "/api/projects") {
       handleProjects(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/epics") {
+      handleEpics(req, res);
       return;
     }
 

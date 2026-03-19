@@ -22,6 +22,16 @@ const projectPickerGroup = document.getElementById("project-picker-group");
 const generateActionGroup = document.getElementById("generate-action-group");
 const projectEmptyState = document.getElementById("project-empty-state");
 const projectSelect = document.getElementById("projectKey");
+const partialFilterSection = document.getElementById("partial-filter-section");
+const completionStateSelect = document.getElementById("completion-state");
+const statusOptions = document.getElementById("status-options");
+const milestoneOptions = document.getElementById("milestone-options");
+const labelOptions = document.getElementById("label-options");
+const sprintOptions = document.getElementById("sprint-options");
+const epicOptions = document.getElementById("epic-options");
+const epicSelectionCount = document.getElementById("epic-selection-count");
+const selectAllEpicsButton = document.getElementById("select-all-epics");
+const clearAllEpicsButton = document.getElementById("clear-all-epics");
 const reportMetadataSection = document.getElementById("report-metadata-section");
 const reportMetadataForm = document.getElementById("report-metadata-form");
 const reportBody = document.getElementById("report-body");
@@ -47,6 +57,7 @@ let authEnabled = false;
 let allowedEmailDomain = "decode.agency";
 let supabase = null;
 let accessToken = null;
+let latestEpicFilters = null;
 
 function closeMenu() {
   menuPanel.classList.add("hidden");
@@ -396,7 +407,7 @@ function applyManagedAuthUi(config) {
     loginEyebrow.textContent = "Project";
     loginTitle.textContent = "Project Selection";
     loginCopy.textContent =
-      "Jira credentials are managed by the deployment. Choose a project, then generate the report.";
+      "Jira credentials are managed by the deployment. Choose a project, refine the epic scope if needed, then generate the report.";
     return;
   }
 
@@ -408,16 +419,181 @@ function applyManagedAuthUi(config) {
   loginEyebrow.textContent = "Connect";
   loginTitle.textContent = "Jira Access";
   loginCopy.textContent =
-    "Load available projects first, then generate the report once the project is selected.";
+    "Load available projects first, then choose a project and refine the epic scope before generating the report.";
 }
 
 function getSelectedProject() {
   return loadedProjects.find((project) => project.key === projectSelect.value) || null;
 }
 
+function renderCheckboxOptions(container, values, kind, checkedValues = null) {
+  container.innerHTML = "";
+
+  if (!values || values.length === 0) {
+    container.innerHTML = '<p class="filter-empty">No options available for this project.</p>';
+    return;
+  }
+
+  for (const value of values) {
+    const option = document.createElement("label");
+    option.className = "filter-option";
+    option.innerHTML = `
+      <input type="checkbox" data-filter-kind="${kind}" value="${escapeHtml(value)}" />
+      <span>${escapeHtml(value)}</span>
+    `;
+
+    const input = option.querySelector("input");
+    if (!checkedValues || checkedValues.has(value)) {
+      input.checked = true;
+    }
+
+    container.appendChild(option);
+  }
+}
+
+function getCheckedValues(kind) {
+  return Array.from(document.querySelectorAll(`[data-filter-kind="${kind}"]:checked`)).map(
+    (input) => input.value
+  );
+}
+
+function updateEpicSelectionCount() {
+  const total = epicOptions.querySelectorAll('input[type="checkbox"]').length;
+  const selected = epicOptions.querySelectorAll('input[type="checkbox"]:checked').length;
+
+  if (total === 0) {
+    epicSelectionCount.textContent = "No epics available for this project.";
+    return;
+  }
+
+  if (selected === total) {
+    epicSelectionCount.textContent = `All ${total} loaded epics are currently included.`;
+    return;
+  }
+
+  epicSelectionCount.textContent = `${selected} of ${total} epics are currently included.`;
+}
+
+function resetPartialFilters() {
+  latestEpicFilters = null;
+  partialFilterSection.classList.add("hidden");
+  completionStateSelect.value = "all";
+  statusOptions.innerHTML = "";
+  milestoneOptions.innerHTML = "";
+  labelOptions.innerHTML = "";
+  sprintOptions.innerHTML = "";
+  epicOptions.innerHTML = "";
+  epicSelectionCount.textContent = "All loaded epics are currently included.";
+}
+
+function renderPartialFilters(epicPayload) {
+  latestEpicFilters = epicPayload;
+  completionStateSelect.value = "all";
+  renderCheckboxOptions(
+    statusOptions,
+    epicPayload.filters.statuses,
+    "status",
+    new Set()
+  );
+  renderCheckboxOptions(
+    milestoneOptions,
+    epicPayload.filters.milestones,
+    "milestone",
+    new Set()
+  );
+  renderCheckboxOptions(
+    labelOptions,
+    epicPayload.filters.labels,
+    "label",
+    new Set()
+  );
+  renderCheckboxOptions(
+    sprintOptions,
+    epicPayload.filters.sprints,
+    "sprint",
+    new Set()
+  );
+  epicOptions.innerHTML = "";
+
+  for (const epic of epicPayload.epics) {
+    const option = document.createElement("label");
+    option.className = "filter-option";
+    option.innerHTML = `
+      <input type="checkbox" data-filter-kind="epic" value="${escapeHtml(epic.key)}" checked />
+      <span>${escapeHtml(epic.key)} - ${escapeHtml(epic.summary)}</span>
+    `;
+    epicOptions.appendChild(option);
+  }
+
+  updateEpicSelectionCount();
+  partialFilterSection.classList.toggle("hidden", epicPayload.epics.length === 0);
+}
+
+function getSelectedEpicKeys() {
+  return Array.from(epicOptions.querySelectorAll('input[type="checkbox"]:checked'))
+    .map((input) => input.value || "")
+    .filter(Boolean);
+}
+
+function getReportFilters() {
+  return {
+    completionState: completionStateSelect.value || "all",
+    selectedEpicKeys: getSelectedEpicKeys(),
+    statuses: getCheckedValues("status"),
+    milestones: getCheckedValues("milestone"),
+    labels: getCheckedValues("label"),
+    sprints: getCheckedValues("sprint"),
+  };
+}
+
+async function loadEpicFilters() {
+  const payload = getFormPayload();
+  const { projectKey } = payload;
+
+  resetPartialFilters();
+  latestRows = [];
+  latestBaseSummary = null;
+  latestRenderedSummary = null;
+  exportActions.classList.add("hidden");
+  reportMetadataSection.classList.add("hidden");
+  reportSection.classList.add("hidden");
+  summarySection.classList.add("hidden");
+  generateActionGroup.classList.add("hidden");
+
+  if (!projectKey) {
+    setStatus("Choose a project to load its epics.");
+    return;
+  }
+
+  setStatus("Loading epic filters...");
+
+  try {
+    const data = await postJson("/api/epics", payload);
+    hideError();
+    renderPartialFilters(data);
+    generateActionGroup.classList.toggle("hidden", data.epics.length === 0);
+    setStatus(
+      data.epics.length > 0
+        ? `Loaded ${data.epics.length} epics. Adjust filters, then generate the report.`
+        : "No epics were returned for this project."
+    );
+  } catch (error) {
+    renderError(error.payload, error.message);
+    setStatus(error.message, true);
+  }
+}
+
 async function loadProjects() {
   const payload = getFormPayload();
   setStatus("Loading Jira projects...");
+  resetPartialFilters();
+  latestRows = [];
+  latestBaseSummary = null;
+  latestRenderedSummary = null;
+  exportActions.classList.add("hidden");
+  reportMetadataSection.classList.add("hidden");
+  reportSection.classList.add("hidden");
+  summarySection.classList.add("hidden");
 
   try {
     const data = await postJson("/api/projects", payload);
@@ -426,11 +602,11 @@ async function loadProjects() {
     renderProjectOptions(loadedProjects);
     const hasProjects = data.projects.length > 0;
     projectPickerGroup.classList.toggle("hidden", !hasProjects);
-    generateActionGroup.classList.toggle("hidden", !hasProjects);
+    generateActionGroup.classList.add("hidden");
     projectEmptyState.classList.toggle("hidden", hasProjects);
     setStatus(
       hasProjects
-        ? `Loaded ${data.projects.length} projects.`
+        ? `Loaded ${data.projects.length} projects. Choose one to load its epic filters.`
         : "No Jira projects were returned for this account."
     );
   } catch (error) {
@@ -711,6 +887,7 @@ async function handleLogout() {
   reportMetadataSection.classList.add("hidden");
   reportSection.classList.add("hidden");
   summarySection.classList.add("hidden");
+  resetPartialFilters();
   projectPickerGroup.classList.add("hidden");
   generateActionGroup.classList.add("hidden");
   projectEmptyState.classList.add("hidden");
@@ -787,7 +964,12 @@ loadProjectsButton.addEventListener("click", loadProjects);
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const { email, apiToken, projectKey } = getFormPayload();
-  const payload = { email, apiToken, projectKey };
+  const payload = {
+    email,
+    apiToken,
+    projectKey,
+    filters: getReportFilters(),
+  };
   setStatus("Generating report. This can take a while for large projects...");
   exportButton.disabled = true;
 
@@ -827,6 +1009,43 @@ reportMetadataForm.addEventListener("input", () => {
 dismissErrorButton.addEventListener("click", hideError);
 signupForm.addEventListener("submit", handleSignUp);
 signinForm.addEventListener("submit", handleSignIn);
+projectSelect.addEventListener("change", loadEpicFilters);
+partialFilterSection.addEventListener("change", (event) => {
+  if (event.target.closest("#epic-options")) {
+    updateEpicSelectionCount();
+  }
+});
+selectAllEpicsButton.addEventListener("click", () => {
+  for (const input of epicOptions.querySelectorAll('input[type="checkbox"]')) {
+    input.checked = true;
+  }
+  updateEpicSelectionCount();
+});
+clearAllEpicsButton.addEventListener("click", () => {
+  for (const input of epicOptions.querySelectorAll('input[type="checkbox"]')) {
+    input.checked = false;
+  }
+  updateEpicSelectionCount();
+});
+for (const button of document.querySelectorAll("[data-filter-clear]")) {
+  button.addEventListener("click", () => {
+    const filterKind = button.dataset.filterClear;
+    const map = {
+      status: "status",
+      milestone: "milestone",
+      label: "label",
+      sprint: "sprint",
+    };
+    const checkboxKind = map[filterKind];
+    if (!checkboxKind) {
+      return;
+    }
+
+    for (const input of document.querySelectorAll(`[data-filter-kind="${checkboxKind}"]`)) {
+      input.checked = false;
+    }
+  });
+}
 menuToggle.addEventListener("click", () => {
   const isOpen = !menuPanel.classList.contains("hidden");
   menuPanel.classList.toggle("hidden", isOpen);
