@@ -232,6 +232,21 @@
           </div>
         </div>
         <p class="section-copy">Compare cumulative original estimate, logged time, remaining estimate, and total work over time for the currently included epics.</p>
+        <form id="trend-controls-form" class="trend-controls">
+          <label>
+            Graph Start Date
+            <input id="trendStartDate" name="trendStartDate" type="date" />
+          </label>
+
+          <label>
+            Graph End Date
+            <input id="trendEndDate" name="trendEndDate" type="date" />
+          </label>
+
+          <div class="actions">
+            <button type="button" id="load-trend-button">Load Graph</button>
+          </div>
+        </form>
         <div id="trend-chart" class="trend-chart"></div>
       </section>
 

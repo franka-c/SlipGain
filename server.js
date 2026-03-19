@@ -7,6 +7,7 @@ const {
   handleEpics,
   handleProjects,
   handleReport,
+  handleTrends,
 } = require("./lib/jira");
 
 const PORT = Number(process.env.PORT || 3000);
@@ -61,6 +62,11 @@ function createServer() {
 
     if (req.method === "POST" && url.pathname === "/api/report") {
       handleReport(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/trends") {
+      handleTrends(req, res);
       return;
     }
 

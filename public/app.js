@@ -35,6 +35,8 @@ const reportMetadataSection = document.getElementById("report-metadata-section")
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
+const trendControlsForm = document.getElementById("trend-controls-form");
+const loadTrendButton = document.getElementById("load-trend-button");
 const reportMetadataForm = document.getElementById("report-metadata-form");
 const reportBody = document.getElementById("report-body");
 const reportSection = document.getElementById("report-section");
@@ -63,6 +65,11 @@ let accessToken = null;
 let latestEpicFilters = null;
 let selectedEpicKeysState = null;
 let activeTrendView = "weekly";
+
+function getTrendControlPayload() {
+  const data = new FormData(trendControlsForm);
+  return Object.fromEntries(data.entries());
+}
 
 function closeMenu() {
   menuPanel.classList.add("hidden");
@@ -263,24 +270,32 @@ function getVisibleTrendSeries(view = activeTrendView) {
     return [];
   }
 
-  const metadata = getMetadataPayload();
-  const projectStartDate = parseDateInput(metadata.projectStartDate);
-
-  if (projectStartDate) {
-    const trimmed = series.filter((point) => {
-      const pointDate = parseDateInput(point.date);
-      return pointDate && pointDate >= projectStartDate;
-    });
-
-    return trimmed.length > 0 ? trimmed : [series[series.length - 1]];
-  }
-
   const firstNonZeroIndex = series.findIndex(pointHasAnyTrendValue);
   if (firstNonZeroIndex === -1) {
     return series;
   }
 
   return series.slice(firstNonZeroIndex);
+}
+
+function syncTrendDateDefaults() {
+  const metadata = getMetadataPayload();
+  const trendControls = getTrendControlPayload();
+  const trendStartDateInput = document.getElementById("trendStartDate");
+  const trendEndDateInput = document.getElementById("trendEndDate");
+
+  if (trendStartDateInput && (!trendControls.trendStartDate || !trendStartDateInput.dataset.userSet)) {
+    trendStartDateInput.value = metadata.projectStartDate || "";
+  }
+
+  if (trendEndDateInput && (!trendControls.trendEndDate || !trendEndDateInput.dataset.userSet)) {
+    trendEndDateInput.value = metadata.deadline || "";
+  }
+}
+
+function renderTrendEmptyState(message) {
+  trendChart.innerHTML = `<p class="filter-empty">${escapeHtml(message)}</p>`;
+  trendSection.classList.remove("hidden");
 }
 
 function formatTrendTooltipValue(value) {
@@ -452,8 +467,7 @@ function renderTrendChart() {
   const markup = buildTrendChartMarkup();
 
   if (!markup) {
-    trendChart.innerHTML = '<p class="filter-empty">No historical trend data is available for this selection.</p>';
-    trendSection.classList.add("hidden");
+    renderTrendEmptyState("No historical trend data is available for this selection.");
     return;
   }
 
@@ -837,6 +851,45 @@ function resetTrendData() {
   trendToggleButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.trendView === "weekly");
   });
+  loadTrendButton.disabled = false;
+}
+
+async function loadTrendData() {
+  const { email, apiToken, projectKey } = getFormPayload();
+  const { trendStartDate, trendEndDate } = getTrendControlPayload();
+
+  if (!projectKey) {
+    setStatus("Choose a project before loading the graph.", true);
+    return;
+  }
+
+  loadTrendButton.disabled = true;
+  setStatus("Loading historical graph...");
+
+  try {
+    const data = await postJson("/api/trends", {
+      email,
+      apiToken,
+      projectKey,
+      filters: getReportFilters(),
+      trendRange: {
+        startDate: trendStartDate || undefined,
+        endDate: trendEndDate || undefined,
+      },
+    });
+
+    hideError();
+    latestTrendData = data.trends || null;
+    renderTrendChart();
+    setStatus("Historical graph loaded.");
+  } catch (error) {
+    latestTrendData = null;
+    renderTrendEmptyState("Could not load the historical graph for this date range.");
+    renderError(error.payload, error.message);
+    setStatus(error.message, true);
+  } finally {
+    loadTrendButton.disabled = false;
+  }
 }
 
 function renderPartialFilters(epicPayload) {
@@ -1348,7 +1401,6 @@ form.addEventListener("submit", async (event) => {
     hideError();
     latestRows = data.rows;
     latestBaseSummary = data.summary;
-    latestTrendData = data.trends || null;
     const selectedProject = getSelectedProject();
     const projectTitleInput = document.getElementById("projectTitle");
 
@@ -1357,7 +1409,9 @@ form.addEventListener("submit", async (event) => {
     }
 
     reportMetadataSection.classList.remove("hidden");
-    renderTrendChart();
+    syncTrendDateDefaults();
+    trendSection.classList.remove("hidden");
+    renderTrendEmptyState("Choose a date range and click Load Graph.");
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
     renderRows(data.rows);
     partialFilterSection.classList.add("hidden");
@@ -1380,13 +1434,24 @@ downloadPdfButton.addEventListener("click", downloadPdf);
 trendToggleButtons.forEach((button) => {
   button.addEventListener("click", () => {
     activeTrendView = button.dataset.trendView || "weekly";
-    renderTrendChart();
+    if (latestTrendData) {
+      renderTrendChart();
+    }
   });
 });
 reportMetadataForm.addEventListener("input", () => {
   renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
-  renderTrendChart();
+  syncTrendDateDefaults();
+  if (latestTrendData) {
+    renderTrendChart();
+  }
 });
+trendControlsForm.addEventListener("input", (event) => {
+  if (event.target instanceof HTMLInputElement) {
+    event.target.dataset.userSet = "true";
+  }
+});
+loadTrendButton.addEventListener("click", loadTrendData);
 dismissErrorButton.addEventListener("click", hideError);
 signupForm.addEventListener("submit", handleSignUp);
 signinForm.addEventListener("submit", handleSignIn);
