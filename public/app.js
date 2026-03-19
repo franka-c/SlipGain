@@ -56,6 +56,7 @@ let allowedEmailDomain = "decode.agency";
 let supabase = null;
 let accessToken = null;
 let latestEpicFilters = null;
+let selectedEpicKeysState = null;
 
 function closeMenu() {
   menuPanel.classList.add("hidden");
@@ -472,8 +473,95 @@ function updateEpicSelectionCount() {
   epicSelectionCount.textContent = `${selected} of ${total} epics are currently included.`;
 }
 
+function epicMatchesAutoFilters(epic, filters) {
+  const statuses = filters.statuses || [];
+  const labels = filters.labels || [];
+  const completionState = filters.completionState || "all";
+
+  if (statuses.length > 0 && !statuses.includes(epic.status)) {
+    return false;
+  }
+
+  if (labels.length > 0 && !labels.some((label) => epic.labels.includes(label))) {
+    return false;
+  }
+
+  if (completionState === "completed" && !epic.completed) {
+    return false;
+  }
+
+  if (completionState === "incomplete" && epic.completed) {
+    return false;
+  }
+
+  return true;
+}
+
+function getAutoFilterValues() {
+  return {
+    completionState: completionStateSelect.value || "all",
+    statuses: getCheckedValues("status"),
+    labels: getCheckedValues("label"),
+  };
+}
+
+function syncSelectedEpicKeysState() {
+  selectedEpicKeysState = new Set(
+    Array.from(epicOptions.querySelectorAll('input[type="checkbox"]:checked'))
+      .map((input) => input.value || "")
+      .filter(Boolean)
+  );
+}
+
+function renderEpicOptions() {
+  epicOptions.innerHTML = "";
+
+  if (!latestEpicFilters?.epics?.length) {
+    epicOptions.innerHTML = '<p class="filter-empty">No epics available for this project.</p>';
+    updateEpicSelectionCount();
+    return;
+  }
+
+  const autoFilters = getAutoFilterValues();
+  const visibleEpics = latestEpicFilters.epics.filter((epic) =>
+    epicMatchesAutoFilters(epic, autoFilters)
+  );
+
+  if (visibleEpics.length === 0) {
+    epicOptions.innerHTML =
+      '<p class="filter-empty">No epics match the current status, label, and completion filters.</p>';
+    updateEpicSelectionCount();
+    return;
+  }
+
+  const visibleEpicKeys = new Set(visibleEpics.map((epic) => epic.key));
+  if (selectedEpicKeysState instanceof Set) {
+    selectedEpicKeysState = new Set(
+      [...selectedEpicKeysState].filter((key) => visibleEpicKeys.has(key))
+    );
+  }
+
+  for (const epic of visibleEpics) {
+    const option = document.createElement("label");
+    option.className = "filter-option";
+    option.innerHTML = `
+      <input type="checkbox" data-filter-kind="epic" value="${escapeHtml(epic.key)}" />
+      <span>${escapeHtml(epic.key)} - ${escapeHtml(epic.summary)}</span>
+    `;
+
+    const input = option.querySelector("input");
+    input.checked =
+      !(selectedEpicKeysState instanceof Set) || selectedEpicKeysState.has(epic.key);
+    epicOptions.appendChild(option);
+  }
+
+  syncSelectedEpicKeysState();
+  updateEpicSelectionCount();
+}
+
 function resetPartialFilters() {
   latestEpicFilters = null;
+  selectedEpicKeysState = null;
   partialFilterSection.classList.add("hidden");
   completionStateSelect.value = "all";
   statusOptions.innerHTML = "";
@@ -484,6 +572,7 @@ function resetPartialFilters() {
 
 function renderPartialFilters(epicPayload) {
   latestEpicFilters = epicPayload;
+  selectedEpicKeysState = null;
   completionStateSelect.value = "all";
   renderCheckboxOptions(
     statusOptions,
@@ -497,26 +586,13 @@ function renderPartialFilters(epicPayload) {
     "label",
     new Set()
   );
-  epicOptions.innerHTML = "";
-
-  for (const epic of epicPayload.epics) {
-    const option = document.createElement("label");
-    option.className = "filter-option";
-    option.innerHTML = `
-      <input type="checkbox" data-filter-kind="epic" value="${escapeHtml(epic.key)}" checked />
-      <span>${escapeHtml(epic.key)} - ${escapeHtml(epic.summary)}</span>
-    `;
-    epicOptions.appendChild(option);
-  }
-
-  updateEpicSelectionCount();
+  renderEpicOptions();
   partialFilterSection.classList.toggle("hidden", epicPayload.epics.length === 0);
 }
 
 function getSelectedEpicKeys() {
-  return Array.from(epicOptions.querySelectorAll('input[type="checkbox"]:checked'))
-    .map((input) => input.value || "")
-    .filter(Boolean);
+  syncSelectedEpicKeysState();
+  return selectedEpicKeysState instanceof Set ? [...selectedEpicKeysState] : [];
 }
 
 function getReportFilters() {
@@ -994,19 +1070,27 @@ signinForm.addEventListener("submit", handleSignIn);
 projectSelect.addEventListener("change", loadEpicFilters);
 partialFilterSection.addEventListener("change", (event) => {
   if (event.target.closest("#epic-options")) {
+    syncSelectedEpicKeysState();
     updateEpicSelectionCount();
+    return;
+  }
+
+  if (event.target.matches('[data-filter-kind="status"], [data-filter-kind="label"], #completion-state')) {
+    renderEpicOptions();
   }
 });
 selectAllEpicsButton.addEventListener("click", () => {
   for (const input of epicOptions.querySelectorAll('input[type="checkbox"]')) {
     input.checked = true;
   }
+  syncSelectedEpicKeysState();
   updateEpicSelectionCount();
 });
 clearAllEpicsButton.addEventListener("click", () => {
   for (const input of epicOptions.querySelectorAll('input[type="checkbox"]')) {
     input.checked = false;
   }
+  syncSelectedEpicKeysState();
   updateEpicSelectionCount();
 });
 for (const button of document.querySelectorAll("[data-filter-clear]")) {
@@ -1024,6 +1108,8 @@ for (const button of document.querySelectorAll("[data-filter-clear]")) {
     for (const input of document.querySelectorAll(`[data-filter-kind="${checkboxKind}"]`)) {
       input.checked = false;
     }
+
+    renderEpicOptions();
   });
 }
 menuToggle.addEventListener("click", () => {
