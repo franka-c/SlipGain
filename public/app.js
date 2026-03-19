@@ -118,9 +118,10 @@ function updateFilterMenuState() {
   reportButton.classList.toggle("hidden", !onAdminRoute);
 }
 
-function setStatus(message, isError = false) {
+function setStatus(message, isError = false, isLoading = false) {
   statusEl.textContent = message;
   statusEl.classList.toggle("error", isError);
+  statusEl.classList.toggle("loading", isLoading);
 }
 
 function setAuthStatus(message, isError = false) {
@@ -1685,7 +1686,7 @@ form.addEventListener("submit", async (event) => {
     projectKey,
     filters: getReportFilters(),
   };
-  setStatus("Generating report. This can take a while for large projects...");
+  setStatus("Generating report. This can take a while for large projects...", false, true);
   exportButton.disabled = true;
 
   try {
