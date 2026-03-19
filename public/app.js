@@ -364,7 +364,11 @@ function applyRouteVisibility() {
     section.classList.toggle("route-hidden", onAdminRoute);
   }
 
-  adminSection.classList.toggle("route-hidden", !onAdminRoute || currentUser?.role !== "admin");
+  adminSection.classList.remove("hidden");
+  adminSection.classList.toggle(
+    "route-hidden",
+    !onAdminRoute || currentUser?.role !== "admin"
+  );
   updateFilterMenuState();
 }
 
