@@ -66,12 +66,25 @@
 
       <section class="hidden" id="app-shell">
       <section class="hero">
-        <div>
-          <p class="eyebrow">Jira Slip/Gain</p>
-          <h1>Generate the Slip Gain report.</h1>
-          <p class="lede">
-            Connect to Jira, pick a project, and reproduce the same epic-level slip/gain report directly in the browser.
-          </p>
+        <div class="hero-topbar">
+          <div>
+            <p class="eyebrow">Jira Slip/Gain</p>
+            <h1>Generate the Slip Gain report.</h1>
+            <p class="lede">
+              Connect to Jira, pick a project, and reproduce the same epic-level slip/gain report directly in the browser.
+            </p>
+          </div>
+
+          <div class="menu-wrap hidden" id="account-menu-wrap">
+            <button type="button" id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-haspopup="menu" aria-label="Open account menu">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <div class="menu-panel hidden" id="menu-panel" role="menu">
+              <button type="button" id="logout-button" class="menu-item" role="menuitem">Log Out</button>
+            </div>
+          </div>
         </div>
       </section>
 

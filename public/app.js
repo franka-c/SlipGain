@@ -5,6 +5,10 @@ const appShell = document.getElementById("app-shell");
 const authStatusEl = document.getElementById("auth-status");
 const signupForm = document.getElementById("signup-form");
 const signinForm = document.getElementById("signin-form");
+const accountMenuWrap = document.getElementById("account-menu-wrap");
+const menuToggle = document.getElementById("menu-toggle");
+const menuPanel = document.getElementById("menu-panel");
+const logoutButton = document.getElementById("logout-button");
 
 const form = document.getElementById("config-form");
 const statusEl = document.getElementById("status");
@@ -43,6 +47,11 @@ let authEnabled = false;
 let allowedEmailDomain = "decode.agency";
 let supabase = null;
 let accessToken = null;
+
+function closeMenu() {
+  menuPanel.classList.add("hidden");
+  menuToggle.setAttribute("aria-expanded", "false");
+}
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -673,11 +682,41 @@ async function updateAuthState(session) {
   if (authEnabled && !session) {
     authCard.classList.remove("hidden");
     appShell.classList.add("hidden");
+    accountMenuWrap.classList.add("hidden");
+    closeMenu();
     return;
   }
 
   authCard.classList.add("hidden");
   appShell.classList.remove("hidden");
+  accountMenuWrap.classList.toggle("hidden", !(authEnabled && session));
+}
+
+async function handleLogout() {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    setAuthStatus(error.message, true);
+    return;
+  }
+
+  latestRows = [];
+  latestBaseSummary = null;
+  latestRenderedSummary = null;
+  loadedProjects = [];
+  exportActions.classList.add("hidden");
+  reportMetadataSection.classList.add("hidden");
+  reportSection.classList.add("hidden");
+  summarySection.classList.add("hidden");
+  projectPickerGroup.classList.add("hidden");
+  generateActionGroup.classList.add("hidden");
+  projectEmptyState.classList.add("hidden");
+  renderProjectOptions([]);
+  closeMenu();
+  setAuthStatus("Signed out.");
 }
 
 async function handleSignUp(event) {
@@ -788,6 +827,17 @@ reportMetadataForm.addEventListener("input", () => {
 dismissErrorButton.addEventListener("click", hideError);
 signupForm.addEventListener("submit", handleSignUp);
 signinForm.addEventListener("submit", handleSignIn);
+menuToggle.addEventListener("click", () => {
+  const isOpen = !menuPanel.classList.contains("hidden");
+  menuPanel.classList.toggle("hidden", isOpen);
+  menuToggle.setAttribute("aria-expanded", String(!isOpen));
+});
+logoutButton.addEventListener("click", handleLogout);
+document.addEventListener("click", (event) => {
+  if (!accountMenuWrap.contains(event.target)) {
+    closeMenu();
+  }
+});
 
 document.addEventListener("DOMContentLoaded", async () => {
   const today = new Date().toISOString().slice(0, 10);
