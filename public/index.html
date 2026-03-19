@@ -220,6 +220,21 @@
         </form>
       </section>
 
+      <section class="card hidden trend-card" id="trend-section">
+        <div class="section-head trend-head">
+          <div>
+            <p class="eyebrow">History</p>
+            <h2>Workload Trend</h2>
+          </div>
+          <div class="trend-toggle" role="tablist" aria-label="Trend view">
+            <button type="button" class="trend-toggle-button active" id="trend-weekly" data-trend-view="weekly">Weekly</button>
+            <button type="button" class="trend-toggle-button" id="trend-monthly" data-trend-view="monthly">Monthly</button>
+          </div>
+        </div>
+        <p class="section-copy">Compare cumulative original estimate, logged time, remaining estimate, and total work over time for the currently included epics.</p>
+        <div id="trend-chart" class="trend-chart"></div>
+      </section>
+
       <section id="summary-section" class="summary-grid hidden"></section>
 
       <section class="card error-card hidden" id="error-section">

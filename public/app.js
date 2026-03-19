@@ -32,6 +32,9 @@ const epicSelectionCount = document.getElementById("epic-selection-count");
 const selectAllEpicsButton = document.getElementById("select-all-epics");
 const clearAllEpicsButton = document.getElementById("clear-all-epics");
 const reportMetadataSection = document.getElementById("report-metadata-section");
+const trendSection = document.getElementById("trend-section");
+const trendChart = document.getElementById("trend-chart");
+const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
 const reportMetadataForm = document.getElementById("report-metadata-form");
 const reportBody = document.getElementById("report-body");
 const reportSection = document.getElementById("report-section");
@@ -51,6 +54,7 @@ let latestRows = [];
 let loadedProjects = [];
 let latestBaseSummary = null;
 let latestRenderedSummary = null;
+let latestTrendData = null;
 let managedAuth = false;
 let authEnabled = false;
 let allowedEmailDomain = "decode.agency";
@@ -58,6 +62,7 @@ let supabase = null;
 let accessToken = null;
 let latestEpicFilters = null;
 let selectedEpicKeysState = null;
+let activeTrendView = "weekly";
 
 function closeMenu() {
   menuPanel.classList.add("hidden");
@@ -236,6 +241,182 @@ function renderMetricProgressBar(value) {
       <div class="metric-progress-fill" style="width:${pct * 100}%; background:${color};"></div>
     </div>
   `;
+}
+
+function getTrendSeries(view = activeTrendView) {
+  return latestTrendData?.[view] || [];
+}
+
+function formatTrendTooltipValue(value) {
+  return `${formatHours(value)}h`;
+}
+
+function renderTrendChart() {
+  const series = getTrendSeries();
+
+  if (!series.length) {
+    trendChart.innerHTML = '<p class="filter-empty">No historical trend data is available for this selection.</p>';
+    trendSection.classList.add("hidden");
+    return;
+  }
+
+  const width = 1040;
+  const height = 420;
+  const margin = { top: 28, right: 30, bottom: 70, left: 70 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const maxValue = Math.max(
+    ...series.flatMap((point) => [
+      point.cumulativeOriginalEstimate,
+      point.cumulativeTimeSpent,
+      point.remainingEstimate,
+      point.totalWork,
+    ]),
+    0
+  );
+  const yMax = Math.max(10, Math.ceil(maxValue / 25) * 25);
+  const yTicks = 5;
+
+  const pointsToPolyline = (key) =>
+    series
+      .map((point, index) => {
+        const x =
+          margin.left +
+          (series.length === 1 ? plotWidth / 2 : (index / (series.length - 1)) * plotWidth);
+        const y =
+          margin.top +
+          plotHeight -
+          (Number(point[key]) / yMax) * plotHeight;
+        return `${x},${y}`;
+      })
+      .join(" ");
+
+  const xPosition = (index) =>
+    margin.left +
+    (series.length === 1 ? plotWidth / 2 : (index / (series.length - 1)) * plotWidth);
+
+  const yPosition = (value) =>
+    margin.top + plotHeight - (Number(value) / yMax) * plotHeight;
+
+  const lineDefs = [
+    {
+      key: "cumulativeOriginalEstimate",
+      label: "Cumulative Original Estimate",
+      color: "#0f7b48",
+      dash: "",
+      marker: "circle",
+    },
+    {
+      key: "cumulativeTimeSpent",
+      label: "Cumulative Time Spent",
+      color: "#1a33ff",
+      dash: "",
+      marker: "square",
+    },
+    {
+      key: "remainingEstimate",
+      label: "Remaining Estimate",
+      color: "#ff3b30",
+      dash: "",
+      marker: "square",
+    },
+    {
+      key: "totalWork",
+      label: "Total Work",
+      color: "#8f1bb3",
+      dash: "8 6",
+      marker: "triangle",
+    },
+  ];
+
+  const gridLines = Array.from({ length: yTicks + 1 }, (_, index) => {
+    const value = (yMax / yTicks) * index;
+    const y = yPosition(value);
+    return `
+      <line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" class="trend-grid-line" />
+      <text x="${margin.left - 12}" y="${y + 5}" text-anchor="end" class="trend-axis-label">${Math.round(value)}</text>
+    `;
+  }).join("");
+
+  const xLabels = series
+    .map(
+      (point, index) => `
+        <text x="${xPosition(index)}" y="${height - 24}" text-anchor="middle" class="trend-axis-label trend-axis-label-x">${escapeHtml(point.label)}</text>
+      `
+    )
+    .join("");
+
+  const pointMarkers = lineDefs
+    .map((line) =>
+      series
+        .map((point, index) => {
+          const x = xPosition(index);
+          const y = yPosition(point[line.key]);
+          const tooltip = `${line.label}: ${formatTrendTooltipValue(point[line.key])}`;
+
+          if (line.marker === "circle") {
+            return `<circle cx="${x}" cy="${y}" r="5" fill="${line.color}"><title>${escapeHtml(tooltip)}</title></circle>`;
+          }
+
+          if (line.marker === "triangle") {
+            const size = 7;
+            return `
+              <polygon points="${x},${y - size} ${x - size},${y + size} ${x + size},${y + size}" fill="${line.color}">
+                <title>${escapeHtml(tooltip)}</title>
+              </polygon>
+            `;
+          }
+
+          return `
+            <rect x="${x - 4.5}" y="${y - 4.5}" width="9" height="9" fill="${line.color}">
+              <title>${escapeHtml(tooltip)}</title>
+            </rect>
+          `;
+        })
+        .join("")
+    )
+    .join("");
+
+  trendChart.innerHTML = `
+    <div class="trend-legend">
+      ${lineDefs
+        .map(
+          (line) => `
+            <div class="trend-legend-item">
+              <span class="trend-legend-swatch" style="--swatch:${line.color}; --dash:${line.dash || "none"};"></span>
+              <span>${line.label}</span>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+    <svg viewBox="0 0 ${width} ${height}" class="trend-svg" aria-label="Historical project workload chart">
+      ${gridLines}
+      <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="trend-axis-line" />
+      <line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" class="trend-axis-line" />
+      ${lineDefs
+        .map(
+          (line) => `
+            <polyline
+              fill="none"
+              stroke="${line.color}"
+              stroke-width="3"
+              stroke-dasharray="${line.dash}"
+              points="${pointsToPolyline(line.key)}"
+            />
+          `
+        )
+        .join("")}
+      ${pointMarkers}
+      ${xLabels}
+      <text x="${margin.left - 48}" y="${margin.top - 6}" class="trend-axis-title">Hours</text>
+    </svg>
+  `;
+
+  trendSection.classList.remove("hidden");
+  trendToggleButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.trendView === activeTrendView);
+  });
 }
 
 function renderSummary(summary) {
@@ -602,6 +783,16 @@ function resetPartialFilters() {
   updateFilterMenuState();
 }
 
+function resetTrendData() {
+  latestTrendData = null;
+  activeTrendView = "weekly";
+  trendChart.innerHTML = "";
+  trendSection.classList.add("hidden");
+  trendToggleButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.trendView === "weekly");
+  });
+}
+
 function renderPartialFilters(epicPayload) {
   latestEpicFilters = epicPayload;
   selectedEpicKeysState = null;
@@ -655,6 +846,7 @@ async function loadEpicFilters() {
   latestRows = [];
   latestBaseSummary = null;
   latestRenderedSummary = null;
+  resetTrendData();
   exportActions.classList.add("hidden");
   reportMetadataSection.classList.add("hidden");
   reportSection.classList.add("hidden");
@@ -691,6 +883,7 @@ async function loadProjects() {
   latestRows = [];
   latestBaseSummary = null;
   latestRenderedSummary = null;
+  resetTrendData();
   exportActions.classList.add("hidden");
   reportMetadataSection.classList.add("hidden");
   reportSection.classList.add("hidden");
@@ -985,6 +1178,7 @@ async function handleLogout() {
   latestRows = [];
   latestBaseSummary = null;
   latestRenderedSummary = null;
+  resetTrendData();
   loadedProjects = [];
   exportActions.classList.add("hidden");
   reportMetadataSection.classList.add("hidden");
@@ -1081,6 +1275,7 @@ form.addEventListener("submit", async (event) => {
     hideError();
     latestRows = data.rows;
     latestBaseSummary = data.summary;
+    latestTrendData = data.trends || null;
     const selectedProject = getSelectedProject();
     const projectTitleInput = document.getElementById("projectTitle");
 
@@ -1089,6 +1284,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     reportMetadataSection.classList.remove("hidden");
+    renderTrendChart();
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
     renderRows(data.rows);
     partialFilterSection.classList.add("hidden");
@@ -1108,6 +1304,12 @@ form.addEventListener("submit", async (event) => {
 adjustFiltersButton.addEventListener("click", showPartialFilters);
 exportButton.addEventListener("click", exportCsv);
 downloadPdfButton.addEventListener("click", downloadPdf);
+trendToggleButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    activeTrendView = button.dataset.trendView || "weekly";
+    renderTrendChart();
+  });
+});
 reportMetadataForm.addEventListener("input", () => {
   renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
 });
