@@ -115,6 +115,12 @@ body {
   background: rgba(11, 108, 240, 0.08);
 }
 
+.admin-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: var(--accent);
@@ -883,6 +889,10 @@ td:nth-child(2) {
 
 .hidden {
   display: none;
+}
+
+.route-hidden {
+  display: none !important;
 }
 
 @media (max-width: 900px) {

@@ -8,11 +8,13 @@ const signinForm = document.getElementById("signin-form");
 const accountMenuWrap = document.getElementById("account-menu-wrap");
 const menuToggle = document.getElementById("menu-toggle");
 const menuPanel = document.getElementById("menu-panel");
+const reportButton = document.getElementById("report-button");
 const adminButton = document.getElementById("admin-button");
 const adjustFiltersButton = document.getElementById("adjust-filters-button");
 const logoutButton = document.getElementById("logout-button");
 
 const form = document.getElementById("config-form");
+const loginCard = document.querySelector(".login-card");
 const statusEl = document.getElementById("status");
 const loginEyebrow = document.getElementById("login-eyebrow");
 const loginTitle = document.getElementById("login-title");
@@ -39,6 +41,7 @@ const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
 const trendControlsForm = document.getElementById("trend-controls-form");
 const loadTrendButton = document.getElementById("load-trend-button");
 const adminSection = document.getElementById("admin-section");
+const backToReportButton = document.getElementById("back-to-report");
 const adminUserForm = document.getElementById("admin-user-form");
 const adminUsersBody = document.getElementById("admin-users-body");
 const adminStatusEl = document.getElementById("admin-status");
@@ -74,6 +77,22 @@ let activeTrendView = "monthly";
 let currentUser = null;
 let approvedUsers = [];
 
+function isAdminRoute() {
+  return window.location.pathname === "/admin";
+}
+
+function navigateTo(path) {
+  if (window.location.pathname === path) {
+    applyRouteVisibility();
+    closeMenu();
+    return;
+  }
+
+  window.history.pushState({}, "", path);
+  applyRouteVisibility();
+  closeMenu();
+}
+
 function getTrendControlPayload() {
   const data = new FormData(trendControlsForm);
   return Object.fromEntries(data.entries());
@@ -85,8 +104,16 @@ function closeMenu() {
 }
 
 function updateFilterMenuState() {
-  adjustFiltersButton.classList.toggle("hidden", !latestEpicFilters?.epics?.length);
-  adminButton.classList.toggle("hidden", currentUser?.role !== "admin");
+  const onAdminRoute = isAdminRoute();
+  adjustFiltersButton.classList.toggle(
+    "hidden",
+    onAdminRoute || !latestEpicFilters?.epics?.length
+  );
+  adminButton.classList.toggle(
+    "hidden",
+    currentUser?.role !== "admin" || onAdminRoute
+  );
+  reportButton.classList.toggle("hidden", !onAdminRoute);
 }
 
 function setStatus(message, isError = false) {
@@ -309,9 +336,36 @@ function openAdminSection() {
     return;
   }
 
-  adminSection.classList.remove("hidden");
-  closeMenu();
-  adminSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  navigateTo("/admin");
+}
+
+function showReportRoute() {
+  navigateTo("/");
+}
+
+function applyRouteVisibility() {
+  const onAdminRoute = isAdminRoute();
+
+  if (onAdminRoute && currentUser?.role && currentUser.role !== "admin") {
+    window.history.replaceState({}, "", "/");
+    applyRouteVisibility();
+    return;
+  }
+
+  for (const section of [
+    loginCard,
+    partialFilterSection,
+    reportMetadataSection,
+    trendSection,
+    summarySection,
+    errorSection,
+    reportSection,
+  ]) {
+    section.classList.toggle("route-hidden", onAdminRoute);
+  }
+
+  adminSection.classList.toggle("route-hidden", !onAdminRoute || currentUser?.role !== "admin");
+  updateFilterMenuState();
 }
 
 function formatDate(value) {
@@ -1461,6 +1515,11 @@ async function updateAuthState(session) {
   authCard.classList.add("hidden");
   appShell.classList.remove("hidden");
   accountMenuWrap.classList.toggle("hidden", !(authEnabled && session));
+  if (isAdminRoute() && currentUser?.role === "admin") {
+    await loadApprovedUsers();
+    setAdminStatus("Approved users loaded.");
+  }
+  applyRouteVisibility();
   updateFilterMenuState();
 }
 
@@ -1628,6 +1687,8 @@ adminButton.addEventListener("click", async () => {
     setAdminStatus(error.message, true);
   }
 });
+reportButton.addEventListener("click", showReportRoute);
+backToReportButton.addEventListener("click", showReportRoute);
 exportButton.addEventListener("click", exportCsv);
 downloadPdfButton.addEventListener("click", downloadPdf);
 trendToggleButtons.forEach((button) => {
@@ -1740,6 +1801,8 @@ document.addEventListener("click", (event) => {
   }
 });
 
+window.addEventListener("popstate", applyRouteVisibility);
+
 document.addEventListener("DOMContentLoaded", async () => {
   const today = new Date().toISOString().slice(0, 10);
   const reportCreationDateInput = document.getElementById("reportCreationDate");
@@ -1767,6 +1830,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (session && managedAuth) {
         await loadProjects();
       }
+      applyRouteVisibility();
       return;
     }
 
@@ -1774,8 +1838,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (config?.managedAuth) {
       await loadProjects();
     }
+    applyRouteVisibility();
   } catch {
     await updateAuthState(null);
+    applyRouteVisibility();
   }
 });
 

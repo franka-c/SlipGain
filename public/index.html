@@ -82,6 +82,7 @@
               <span class="menu-line"></span>
             </button>
             <div class="menu-panel hidden" id="menu-panel" role="menu">
+              <button type="button" id="report-button" class="menu-item hidden" role="menuitem">Report</button>
               <button type="button" id="admin-button" class="menu-item hidden" role="menuitem">Admin</button>
               <button type="button" id="adjust-filters-button" class="menu-item hidden" role="menuitem">Adjust Filters</button>
               <button type="button" id="logout-button" class="menu-item" role="menuitem">Log Out</button>
@@ -257,7 +258,10 @@
             <p class="eyebrow">Admin</p>
             <h2>Approved Users</h2>
           </div>
-          <p class="section-copy">Manage who can access the app and whether they are a regular user or an admin.</p>
+          <div class="admin-head-actions">
+            <p class="section-copy">Manage who can access the app and whether they are a regular user or an admin.</p>
+            <button type="button" id="back-to-report" class="secondary-button">Back to Report</button>
+          </div>
         </div>
 
         <form id="admin-user-form" class="form-grid">

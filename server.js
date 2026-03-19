@@ -82,7 +82,10 @@ function createServer() {
       return;
     }
 
-    const requestedPath = url.pathname === "/" ? "/index.html" : url.pathname;
+    const requestedPath =
+      url.pathname === "/" || url.pathname === "/admin"
+        ? "/index.html"
+        : url.pathname;
     const filePath = path.join(PUBLIC_DIR, requestedPath);
 
     if (!filePath.startsWith(PUBLIC_DIR)) {
