@@ -148,6 +148,14 @@ h1 {
   padding: 24px;
 }
 
+.login-card,
+.partial-filter-card,
+.input-focus-card,
+#error-section,
+#report-section {
+  margin-top: 20px;
+}
+
 .auth-card {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 241, 232, 0.92)),
