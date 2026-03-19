@@ -97,7 +97,7 @@
           </div>
           <p id="login-copy" class="section-copy">Load available projects first, then generate the report once the project is selected.</p>
         </div>
-        <form id="config-form" class="form-grid">
+        <form id="config-form" class="form-grid" autocomplete="off">
           <label id="email-group">
             Jira Email
             <input id="email" name="email" type="email" placeholder="pm@company.com" required />
@@ -192,10 +192,10 @@
           <p class="section-copy">Fill these in after the initial report loads. The extra metrics update immediately.</p>
         </div>
 
-        <form id="report-metadata-form" class="form-grid">
+        <form id="report-metadata-form" class="form-grid" autocomplete="off">
           <label>
             Project Title
-            <input id="projectTitle" name="projectTitle" placeholder="RightVybe" />
+            <input id="projectTitle" name="projectTitle" placeholder="RightVybe" autocomplete="off" />
           </label>
 
           <label>

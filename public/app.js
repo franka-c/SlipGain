@@ -1561,6 +1561,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const today = new Date().toISOString().slice(0, 10);
   const reportCreationDateInput = document.getElementById("reportCreationDate");
 
+  resetReportMetadata("");
+
   if (reportCreationDateInput && !reportCreationDateInput.value) {
     reportCreationDateInput.value = today;
   }
