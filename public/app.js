@@ -39,10 +39,6 @@ const epicSelectionCount = document.getElementById("epic-selection-count");
 const selectAllEpicsButton = document.getElementById("select-all-epics");
 const clearAllEpicsButton = document.getElementById("clear-all-epics");
 const reportMetadataSection = document.getElementById("report-metadata-section");
-const lastWeekBreakdownSection = document.getElementById("last-week-breakdown");
-const lastWeekBreakdownBody = document.getElementById("last-week-breakdown-body");
-const issueTimeTraceSection = document.getElementById("issue-time-trace");
-const issueTimeTraceOutput = document.getElementById("issue-time-trace-output");
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
@@ -276,22 +272,6 @@ function resetReportMetadata(projectName = "") {
 
   if (timeSpentLastWeekInput) {
     timeSpentLastWeekInput.value = "";
-  }
-
-  if (lastWeekBreakdownBody) {
-    lastWeekBreakdownBody.innerHTML = "";
-  }
-
-  if (lastWeekBreakdownSection) {
-    lastWeekBreakdownSection.classList.add("hidden");
-  }
-
-  if (issueTimeTraceOutput) {
-    issueTimeTraceOutput.textContent = "";
-  }
-
-  if (issueTimeTraceSection) {
-    issueTimeTraceSection.classList.add("hidden");
   }
 
   if (trendStartDateInput) {
@@ -958,50 +938,6 @@ function renderSummary(summary) {
   summarySection.classList.remove("hidden");
 }
 
-function renderLastWeekBreakdown(entries = []) {
-  if (!lastWeekBreakdownSection || !lastWeekBreakdownBody) {
-    return;
-  }
-
-  if (!entries.length) {
-    lastWeekBreakdownBody.innerHTML = `
-      <tr>
-        <td colspan="4" class="table-empty-cell">No worklogs were counted in the previous week.</td>
-      </tr>
-    `;
-  } else {
-    lastWeekBreakdownBody.innerHTML = entries
-      .map(
-        (entry) => `
-          <tr>
-            <td>${escapeHtml(entry.issueKey)}${entry.summary ? ` - ${escapeHtml(entry.summary)}` : ""}</td>
-            <td>${escapeHtml(entry.epicKey)}${entry.epicSummary ? ` - ${escapeHtml(entry.epicSummary)}` : ""}</td>
-            <td>${escapeHtml(entry.issueType)}</td>
-            <td>${formatHours(entry.hours)}</td>
-          </tr>
-        `
-      )
-      .join("");
-  }
-
-  lastWeekBreakdownSection.classList.remove("hidden");
-}
-
-function renderIssueTimeTrace(trace) {
-  if (!issueTimeTraceSection || !issueTimeTraceOutput) {
-    return;
-  }
-
-  if (!trace) {
-    issueTimeTraceOutput.textContent = "";
-    issueTimeTraceSection.classList.add("hidden");
-    return;
-  }
-
-  issueTimeTraceOutput.textContent = JSON.stringify(trace, null, 2);
-  issueTimeTraceSection.classList.remove("hidden");
-}
-
 async function loadLastWeekHours(payload) {
   const timeSpentLastWeekInput = document.getElementById("timeSpentLastWeek");
 
@@ -1022,18 +958,12 @@ async function loadLastWeekHours(payload) {
       );
       timeSpentLastWeekInput.placeholder = "0";
     }
-
-    renderLastWeekBreakdown(data.timeSpentLastWeekBreakdown || []);
-    renderIssueTimeTrace(data.debug?.issueTimeTrace || null);
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
   } catch (error) {
     if (timeSpentLastWeekInput) {
       timeSpentLastWeekInput.value = "";
       timeSpentLastWeekInput.placeholder = "0";
     }
-
-    renderLastWeekBreakdown([]);
-    renderIssueTimeTrace(null);
     setStatus(
       "Report ready. Last week hours could not be loaded.",
       true
@@ -1992,8 +1922,6 @@ form.addEventListener("submit", async (event) => {
       timeSpentLastWeekInput.value = "";
       timeSpentLastWeekInput.placeholder = "Loading...";
     }
-    renderLastWeekBreakdown([]);
-    renderIssueTimeTrace(null);
 
     reportMetadataSection.classList.remove("hidden");
     syncTrendDateDefaults();
