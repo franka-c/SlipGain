@@ -8,6 +8,7 @@ const {
   handleConfig,
   handleCurrentUser,
   handleEpics,
+  handleLastWeekTime,
   handleProjects,
   handleReport,
   handleTrends,
@@ -80,6 +81,11 @@ function createServer() {
 
     if (req.method === "POST" && url.pathname === "/api/report") {
       handleReport(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/last-week-hours") {
+      handleLastWeekTime(req, res);
       return;
     }
 

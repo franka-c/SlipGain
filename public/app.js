@@ -1002,6 +1002,45 @@ function renderIssueTimeTrace(trace) {
   issueTimeTraceSection.classList.remove("hidden");
 }
 
+async function loadLastWeekHours(payload) {
+  const timeSpentLastWeekInput = document.getElementById("timeSpentLastWeek");
+
+  if (timeSpentLastWeekInput) {
+    timeSpentLastWeekInput.value = "";
+    timeSpentLastWeekInput.placeholder = "Loading...";
+  }
+
+  try {
+    const data = await postJson("/api/last-week-hours", {
+      ...payload,
+      debugParentIssueKey: "BSPK-1270",
+    });
+
+    if (timeSpentLastWeekInput) {
+      timeSpentLastWeekInput.value = formatHours(
+        Number(data.timeSpentLastWeekPrefill || 0)
+      );
+      timeSpentLastWeekInput.placeholder = "0";
+    }
+
+    renderLastWeekBreakdown(data.timeSpentLastWeekBreakdown || []);
+    renderIssueTimeTrace(data.debug?.issueTimeTrace || null);
+    renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
+  } catch (error) {
+    if (timeSpentLastWeekInput) {
+      timeSpentLastWeekInput.value = "";
+      timeSpentLastWeekInput.placeholder = "0";
+    }
+
+    renderLastWeekBreakdown([]);
+    renderIssueTimeTrace(null);
+    setStatus(
+      "Report ready. Last week hours could not be loaded.",
+      true
+    );
+  }
+}
+
 function renderRows(rows) {
   reportBody.innerHTML = rows
     .map(
@@ -1933,7 +1972,6 @@ form.addEventListener("submit", async (event) => {
     apiToken,
     projectKey,
     filters: getReportFilters(),
-    debugParentIssueKey: "BSPK-1270",
   };
   setStatus("Generating report. This can take a while for large projects...", false, true);
   exportButton.disabled = true;
@@ -1950,14 +1988,12 @@ form.addEventListener("submit", async (event) => {
     if (projectTitleInput && !projectTitleInput.value) {
       projectTitleInput.value = selectedProject?.name || "";
     }
-
     if (timeSpentLastWeekInput) {
-      timeSpentLastWeekInput.value = formatHours(
-        Number(data.summary?.timeSpentLastWeekPrefill || 0)
-      );
+      timeSpentLastWeekInput.value = "";
+      timeSpentLastWeekInput.placeholder = "Loading...";
     }
-    renderLastWeekBreakdown(data.summary?.timeSpentLastWeekBreakdown || []);
-    renderIssueTimeTrace(data.debug?.issueTimeTrace || null);
+    renderLastWeekBreakdown([]);
+    renderIssueTimeTrace(null);
 
     reportMetadataSection.classList.remove("hidden");
     syncTrendDateDefaults();
@@ -1970,6 +2006,7 @@ form.addEventListener("submit", async (event) => {
     exportButton.disabled = data.rows.length === 0;
     downloadPdfButton.disabled = data.rows.length === 0;
     setStatus(`Report ready. ${data.rows.length} epics included.`);
+    loadLastWeekHours(payload);
   } catch (error) {
     exportActions.classList.add("hidden");
     exportButton.disabled = true;
