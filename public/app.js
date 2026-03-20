@@ -956,7 +956,7 @@ function renderLastWeekBreakdown(entries = []) {
   if (!entries.length) {
     lastWeekBreakdownBody.innerHTML = `
       <tr>
-        <td colspan="3" class="table-empty-cell">No worklogs were counted in the previous week.</td>
+        <td colspan="4" class="table-empty-cell">No worklogs were counted in the previous week.</td>
       </tr>
     `;
   } else {
@@ -965,6 +965,7 @@ function renderLastWeekBreakdown(entries = []) {
         (entry) => `
           <tr>
             <td>${escapeHtml(entry.issueKey)}${entry.summary ? ` - ${escapeHtml(entry.summary)}` : ""}</td>
+            <td>${escapeHtml(entry.epicKey)}${entry.epicSummary ? ` - ${escapeHtml(entry.epicSummary)}` : ""}</td>
             <td>${escapeHtml(entry.issueType)}</td>
             <td>${formatHours(entry.hours)}</td>
           </tr>
