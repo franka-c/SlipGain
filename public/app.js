@@ -39,6 +39,9 @@ const epicSelectionCount = document.getElementById("epic-selection-count");
 const selectAllEpicsButton = document.getElementById("select-all-epics");
 const clearAllEpicsButton = document.getElementById("clear-all-epics");
 const reportMetadataSection = document.getElementById("report-metadata-section");
+const epicTimeTraceSection = document.getElementById("epic-time-trace");
+const epicTimeTraceNote = document.getElementById("epic-time-trace-note");
+const epicTimeTraceBody = document.getElementById("epic-time-trace-body");
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
@@ -272,6 +275,18 @@ function resetReportMetadata(projectName = "") {
 
   if (timeSpentLastWeekInput) {
     timeSpentLastWeekInput.value = "";
+  }
+
+  if (epicTimeTraceNote) {
+    epicTimeTraceNote.textContent = "";
+  }
+
+  if (epicTimeTraceBody) {
+    epicTimeTraceBody.innerHTML = "";
+  }
+
+  if (epicTimeTraceSection) {
+    epicTimeTraceSection.classList.add("hidden");
   }
 
   if (trendStartDateInput) {
@@ -936,6 +951,41 @@ function renderSummary(summary) {
     </article>
   `;
   summarySection.classList.remove("hidden");
+}
+
+function renderEpicTimeTrace(trace) {
+  if (!epicTimeTraceSection || !epicTimeTraceBody || !epicTimeTraceNote) {
+    return;
+  }
+
+  if (!trace) {
+    epicTimeTraceNote.textContent = "";
+    epicTimeTraceBody.innerHTML = "";
+    epicTimeTraceSection.classList.add("hidden");
+    return;
+  }
+
+  epicTimeTraceNote.textContent =
+    `${trace.epicKey} totals ${formatHours(trace.resolvedTimeSpent)}h from ${trace.resolvedChildCount} items. ` +
+    `Direct children contribute ${formatHours(trace.directTimeSpent)}h; subtasks add ${formatHours(trace.addedBySubtasks)}h.`;
+
+  epicTimeTraceBody.innerHTML = trace.issues.length
+    ? trace.issues
+        .map(
+          (issue) => `
+            <tr>
+              <td>${escapeHtml(issue.issueKey)}${issue.summary ? ` - ${escapeHtml(issue.summary)}` : ""}</td>
+              <td>${escapeHtml(issue.issueType)}</td>
+              <td>${escapeHtml(issue.source)}</td>
+              <td>${escapeHtml(issue.parentKey || "")}</td>
+              <td>${formatHours(issue.timeSpent)}</td>
+            </tr>
+          `
+        )
+        .join("")
+    : `<tr><td colspan="5" class="table-empty-cell">No child issues were resolved for this epic.</td></tr>`;
+
+  epicTimeTraceSection.classList.remove("hidden");
 }
 
 async function loadLastWeekHours(payload) {
@@ -1902,6 +1952,7 @@ form.addEventListener("submit", async (event) => {
     apiToken,
     projectKey,
     filters: getReportFilters(),
+    debugEpicKey: "BSPK-5",
   };
   setStatus("Generating report. This can take a while for large projects...", false, true);
   exportButton.disabled = true;
@@ -1929,6 +1980,7 @@ form.addEventListener("submit", async (event) => {
     renderTrendEmptyState("Choose a date range and click Load Graph.");
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
     renderRows(data.rows);
+    renderEpicTimeTrace(data.debug?.epicTimeTrace || null);
     partialFilterSection.classList.add("hidden");
     exportActions.classList.toggle("hidden", data.rows.length === 0);
     exportButton.disabled = data.rows.length === 0;
