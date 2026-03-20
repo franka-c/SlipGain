@@ -84,6 +84,9 @@ let approvedUsers = [];
 let pendingRequests = [];
 let passwordRecoveryMode = false;
 const defaultAuthCopy = authCopy?.textContent || "";
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
+let inactivityTimeoutId = null;
+let inactivityListenersBound = false;
 
 function isAdminRoute() {
   return window.location.pathname === "/admin";
@@ -191,6 +194,44 @@ function setButtonLoading(button, isLoading, loadingLabel) {
   button.disabled = isLoading;
   button.classList.toggle("button-loading", isLoading);
   button.textContent = isLoading ? loadingLabel : button.dataset.defaultLabel;
+}
+
+function clearInactivityTimeout() {
+  if (inactivityTimeoutId) {
+    window.clearTimeout(inactivityTimeoutId);
+    inactivityTimeoutId = null;
+  }
+}
+
+async function handleInactivityLogout() {
+  await handleLogout("Signed out after 1 hour of inactivity.");
+}
+
+function resetInactivityTimer() {
+  if (!authEnabled || !accessToken || passwordRecoveryMode) {
+    clearInactivityTimeout();
+    return;
+  }
+
+  clearInactivityTimeout();
+  inactivityTimeoutId = window.setTimeout(() => {
+    handleInactivityLogout().catch((error) => {
+      setAuthStatus(error.message || "Could not sign out inactive session.", true);
+    });
+  }, INACTIVITY_TIMEOUT_MS);
+}
+
+function bindInactivityListeners() {
+  if (inactivityListenersBound) {
+    return;
+  }
+
+  const events = ["pointerdown", "keydown", "mousemove", "scroll", "touchstart"];
+  for (const eventName of events) {
+    window.addEventListener(eventName, resetInactivityTimer, { passive: true });
+  }
+
+  inactivityListenersBound = true;
 }
 
 function getFormPayload() {
@@ -1600,6 +1641,7 @@ async function updateAuthState(session) {
   accessToken = session?.access_token || null;
 
   if (authEnabled && passwordRecoveryMode) {
+    clearInactivityTimeout();
     currentUser = null;
     authCard.classList.remove("hidden");
     appShell.classList.add("hidden");
@@ -1611,6 +1653,7 @@ async function updateAuthState(session) {
   }
 
   if (authEnabled && !session) {
+    clearInactivityTimeout();
     currentUser = null;
     authCard.classList.remove("hidden");
     appShell.classList.add("hidden");
@@ -1634,9 +1677,10 @@ async function updateAuthState(session) {
   }
   applyRouteVisibility();
   updateFilterMenuState();
+  resetInactivityTimer();
 }
 
-async function handleLogout() {
+async function handleLogout(message = "Signed out.") {
   if (!supabase) {
     return;
   }
@@ -1666,7 +1710,8 @@ async function handleLogout() {
   projectEmptyState.classList.add("hidden");
   renderProjectOptions([]);
   closeMenu();
-  setAuthStatus("Signed out.");
+  clearInactivityTimeout();
+  setAuthStatus(message);
 }
 
 async function handleSignUp(event) {
@@ -2028,6 +2073,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const config = await fetchConfig();
     applyManagedAuthUi(config);
     setPasswordRecoveryMode(hasRecoveryHash());
+    bindInactivityListeners();
 
     if (config?.authEnabled && config.supabaseUrl && config.supabaseAnonKey) {
       supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
