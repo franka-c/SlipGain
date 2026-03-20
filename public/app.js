@@ -41,8 +41,6 @@ const clearAllEpicsButton = document.getElementById("clear-all-epics");
 const reportMetadataSection = document.getElementById("report-metadata-section");
 const lastWeekBreakdownSection = document.getElementById("last-week-breakdown");
 const lastWeekBreakdownBody = document.getElementById("last-week-breakdown-body");
-const childLookupTraceSection = document.getElementById("child-lookup-trace");
-const childLookupTraceOutput = document.getElementById("child-lookup-trace-output");
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
@@ -284,14 +282,6 @@ function resetReportMetadata(projectName = "") {
 
   if (lastWeekBreakdownSection) {
     lastWeekBreakdownSection.classList.add("hidden");
-  }
-
-  if (childLookupTraceOutput) {
-    childLookupTraceOutput.textContent = "";
-  }
-
-  if (childLookupTraceSection) {
-    childLookupTraceSection.classList.add("hidden");
   }
 
   if (trendStartDateInput) {
@@ -985,21 +975,6 @@ function renderLastWeekBreakdown(entries = []) {
   }
 
   lastWeekBreakdownSection.classList.remove("hidden");
-}
-
-function renderChildLookupTrace(trace) {
-  if (!childLookupTraceSection || !childLookupTraceOutput) {
-    return;
-  }
-
-  if (!trace) {
-    childLookupTraceOutput.textContent = "";
-    childLookupTraceSection.classList.add("hidden");
-    return;
-  }
-
-  childLookupTraceOutput.textContent = JSON.stringify(trace, null, 2);
-  childLookupTraceSection.classList.remove("hidden");
 }
 
 function renderRows(rows) {
@@ -1933,7 +1908,6 @@ form.addEventListener("submit", async (event) => {
     apiToken,
     projectKey,
     filters: getReportFilters(),
-    debugIssueKey: "PAC-62",
   };
   setStatus("Generating report. This can take a while for large projects...", false, true);
   exportButton.disabled = true;
@@ -1957,7 +1931,6 @@ form.addEventListener("submit", async (event) => {
       );
     }
     renderLastWeekBreakdown(data.summary?.timeSpentLastWeekBreakdown || []);
-    renderChildLookupTrace(data.debug?.childLookupTrace || null);
 
     reportMetadataSection.classList.remove("hidden");
     syncTrendDateDefaults();
