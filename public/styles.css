@@ -904,6 +904,11 @@ td {
   white-space: nowrap;
 }
 
+.table-empty-cell {
+  color: var(--muted);
+  font-style: italic;
+}
+
 th {
   font-size: 0.86rem;
   text-transform: uppercase;
