@@ -39,8 +39,6 @@ const epicSelectionCount = document.getElementById("epic-selection-count");
 const selectAllEpicsButton = document.getElementById("select-all-epics");
 const clearAllEpicsButton = document.getElementById("clear-all-epics");
 const reportMetadataSection = document.getElementById("report-metadata-section");
-const lastWeekBreakdownSection = document.getElementById("last-week-breakdown");
-const lastWeekBreakdownBody = document.getElementById("last-week-breakdown-body");
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
@@ -274,14 +272,6 @@ function resetReportMetadata(projectName = "") {
 
   if (timeSpentLastWeekInput) {
     timeSpentLastWeekInput.value = "";
-  }
-
-  if (lastWeekBreakdownBody) {
-    lastWeekBreakdownBody.innerHTML = "";
-  }
-
-  if (lastWeekBreakdownSection) {
-    lastWeekBreakdownSection.classList.add("hidden");
   }
 
   if (trendStartDateInput) {
@@ -946,35 +936,6 @@ function renderSummary(summary) {
     </article>
   `;
   summarySection.classList.remove("hidden");
-}
-
-function renderLastWeekBreakdown(entries = []) {
-  if (!lastWeekBreakdownSection || !lastWeekBreakdownBody) {
-    return;
-  }
-
-  if (!entries.length) {
-    lastWeekBreakdownBody.innerHTML = `
-      <tr>
-        <td colspan="4" class="table-empty-cell">No worklogs were counted in the previous week.</td>
-      </tr>
-    `;
-  } else {
-    lastWeekBreakdownBody.innerHTML = entries
-      .map(
-        (entry) => `
-          <tr>
-            <td>${escapeHtml(entry.issueKey)}${entry.summary ? ` - ${escapeHtml(entry.summary)}` : ""}</td>
-            <td>${escapeHtml(entry.epicKey)}${entry.epicSummary ? ` - ${escapeHtml(entry.epicSummary)}` : ""}</td>
-            <td>${escapeHtml(entry.issueType)}</td>
-            <td>${formatHours(entry.hours)}</td>
-          </tr>
-        `
-      )
-      .join("");
-  }
-
-  lastWeekBreakdownSection.classList.remove("hidden");
 }
 
 function renderRows(rows) {
@@ -1930,7 +1891,6 @@ form.addEventListener("submit", async (event) => {
         Number(data.summary?.timeSpentLastWeekPrefill || 0)
       );
     }
-    renderLastWeekBreakdown(data.summary?.timeSpentLastWeekBreakdown || []);
 
     reportMetadataSection.classList.remove("hidden");
     syncTrendDateDefaults();
