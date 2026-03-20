@@ -1880,9 +1880,16 @@ form.addEventListener("submit", async (event) => {
     latestBaseSummary = data.summary;
     const selectedProject = getSelectedProject();
     const projectTitleInput = document.getElementById("projectTitle");
+    const timeSpentLastWeekInput = document.getElementById("timeSpentLastWeek");
 
     if (projectTitleInput && !projectTitleInput.value) {
       projectTitleInput.value = selectedProject?.name || "";
+    }
+
+    if (timeSpentLastWeekInput) {
+      timeSpentLastWeekInput.value = formatHours(
+        Number(data.summary?.timeSpentLastWeekPrefill || 0)
+      );
     }
 
     reportMetadataSection.classList.remove("hidden");
