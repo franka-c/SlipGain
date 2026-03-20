@@ -967,7 +967,7 @@ function renderEpicTimeTrace(trace) {
 
   epicTimeTraceNote.textContent =
     `${trace.epicKey} totals ${formatHours(trace.resolvedTimeSpent)}h from ${trace.resolvedChildCount} items. ` +
-    `Direct children contribute ${formatHours(trace.directTimeSpent)}h; subtasks add ${formatHours(trace.addedBySubtasks)}h.`;
+    `Epic contributes ${formatHours(trace.epicTimeSpent || 0)}h; direct children contribute ${formatHours(trace.directTimeSpent)}h; subtasks add ${formatHours(trace.addedBySubtasks)}h.`;
 
   epicTimeTraceBody.innerHTML = trace.issues.length
     ? trace.issues
