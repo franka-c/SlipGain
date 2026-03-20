@@ -41,6 +41,8 @@ const clearAllEpicsButton = document.getElementById("clear-all-epics");
 const reportMetadataSection = document.getElementById("report-metadata-section");
 const lastWeekBreakdownSection = document.getElementById("last-week-breakdown");
 const lastWeekBreakdownBody = document.getElementById("last-week-breakdown-body");
+const issueTimeTraceSection = document.getElementById("issue-time-trace");
+const issueTimeTraceOutput = document.getElementById("issue-time-trace-output");
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
@@ -282,6 +284,14 @@ function resetReportMetadata(projectName = "") {
 
   if (lastWeekBreakdownSection) {
     lastWeekBreakdownSection.classList.add("hidden");
+  }
+
+  if (issueTimeTraceOutput) {
+    issueTimeTraceOutput.textContent = "";
+  }
+
+  if (issueTimeTraceSection) {
+    issueTimeTraceSection.classList.add("hidden");
   }
 
   if (trendStartDateInput) {
@@ -975,6 +985,21 @@ function renderLastWeekBreakdown(entries = []) {
   }
 
   lastWeekBreakdownSection.classList.remove("hidden");
+}
+
+function renderIssueTimeTrace(trace) {
+  if (!issueTimeTraceSection || !issueTimeTraceOutput) {
+    return;
+  }
+
+  if (!trace) {
+    issueTimeTraceOutput.textContent = "";
+    issueTimeTraceSection.classList.add("hidden");
+    return;
+  }
+
+  issueTimeTraceOutput.textContent = JSON.stringify(trace, null, 2);
+  issueTimeTraceSection.classList.remove("hidden");
 }
 
 function renderRows(rows) {
@@ -1908,6 +1933,7 @@ form.addEventListener("submit", async (event) => {
     apiToken,
     projectKey,
     filters: getReportFilters(),
+    debugParentIssueKey: "BSPK-1270",
   };
   setStatus("Generating report. This can take a while for large projects...", false, true);
   exportButton.disabled = true;
@@ -1931,6 +1957,7 @@ form.addEventListener("submit", async (event) => {
       );
     }
     renderLastWeekBreakdown(data.summary?.timeSpentLastWeekBreakdown || []);
+    renderIssueTimeTrace(data.debug?.issueTimeTrace || null);
 
     reportMetadataSection.classList.remove("hidden");
     syncTrendDateDefaults();
