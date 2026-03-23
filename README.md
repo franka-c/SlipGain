@@ -103,6 +103,86 @@ With both `approved_users` and `access_requests` in place:
 - approving a request adds the user to `approved_users`
 - the request is marked as `approved` with reviewer metadata
 
+## Optional analytics
+
+To enable PostHog analytics for the web app, set:
+
+- `POSTHOG_KEY`
+- `POSTHOG_HOST=https://eu.i.posthog.com`
+
+The app exposes these values to the frontend through `/api/config` and initializes PostHog only when `POSTHOG_KEY` is present.
+
+Current PostHog events implemented:
+
+- `login_succeeded`
+  Properties:
+  - `role`
+  - `managed_auth`
+- `projects_loaded`
+  Properties:
+  - `project_count`
+- `report_generated`
+  Properties:
+  - `project_key`
+  - `epic_count`
+  - `filtered`
+- `partial_report_used`
+  Properties:
+  - `project_key`
+  - `selected_epic_count`
+  - `status_filter_count`
+  - `label_filter_count`
+  - `completion_state`
+- `last_week_hours_loaded`
+  Properties:
+  - `project_key`
+  - `hours`
+- `graph_loaded`
+  Properties:
+  - `trend_view`
+  - `cached`
+  - `start_date`
+  - `end_date`
+- `csv_exported`
+  Properties:
+  - `row_count`
+  - `project_title`
+- `pdf_exported`
+  Properties:
+  - `row_count`
+  - `project_title`
+  - `trend_view`
+- `admin_opened`
+  Properties:
+  - `approved_user_count`
+  - `pending_request_count`
+- `approval_granted`
+  Properties:
+  - `approved_email_domain`
+  - `role`
+- `access_request_created`
+  Properties:
+  - `email_domain`
+- `password_reset_requested`
+  Properties:
+  - `email_domain`
+- `report_generation_failed`
+  Properties:
+  - `stage`
+  - `status_code`
+- `graph_load_failed`
+  Properties:
+  - `trend_view`
+  - `status_code`
+
+Notes:
+
+- Session replay is disabled in the current PostHog setup.
+- Jira credentials and report contents are not sent to PostHog.
+- User identification uses the authenticated email plus:
+  - `email_domain`
+  - `role`
+
 ## Vercel deploy
 
 1. Push this project to GitHub.
@@ -116,6 +196,8 @@ With both `approved_users` and `access_requests` in place:
    - `SUPABASE_ANON_KEY=...`
    - `SUPABASE_SERVICE_ROLE_KEY=...`
    - `ALLOWED_EMAIL_DOMAIN=decode.agency`
+   - `POSTHOG_KEY=...`
+   - `POSTHOG_HOST=https://eu.i.posthog.com`
 4. Deploy.
 
 The frontend is served as static files and the backend runs through Vercel Functions:
