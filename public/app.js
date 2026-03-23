@@ -1007,6 +1007,10 @@ async function loadLastWeekHours(payload) {
       );
       timeSpentLastWeekInput.placeholder = "0";
     }
+    captureEvent("last_week_hours_loaded", {
+      project_key: payload.projectKey,
+      hours: Number(data.timeSpentLastWeekPrefill || 0),
+    });
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
   } catch (error) {
     if (timeSpentLastWeekInput) {
@@ -1017,6 +1021,10 @@ async function loadLastWeekHours(payload) {
       "Report ready. Last week hours could not be loaded.",
       true
     );
+    captureEvent("report_generation_failed", {
+      stage: "last_week_hours",
+      status_code: error?.payload?.debug?.status || null,
+    });
   }
 }
 
@@ -1339,6 +1347,10 @@ async function loadTrendData() {
     renderTrendEmptyState("Could not load the historical graph for this date range.");
     renderError(error.payload, error.message);
     setStatus(error.message, true);
+    captureEvent("graph_load_failed", {
+      trend_view: activeTrendView,
+      status_code: error?.payload?.debug?.status || null,
+    });
   } finally {
     setButtonLoading(loadTrendButton, false);
   }
@@ -1848,6 +1860,9 @@ async function handleSignUp(event) {
   if (approvalGateEnabled) {
     try {
       await postJson("/api/access-request", { email });
+      captureEvent("access_request_created", {
+        email_domain: email.split("@")[1] || "",
+      });
     } catch (requestError) {
       setAuthStatus(requestError.message, true);
       return;
@@ -1931,6 +1946,9 @@ async function handleForgotPassword() {
     return;
   }
 
+  captureEvent("password_reset_requested", {
+    email_domain: email.split("@")[1] || "",
+  });
   setAuthStatus("Password reset email sent. Open the link from your inbox to set a new password.");
 }
 
@@ -2019,6 +2037,20 @@ form.addEventListener("submit", async (event) => {
           (reportFilters.completionState && reportFilters.completionState !== "all")
       ),
     });
+    if (
+      reportFilters.selectedEpicKeys?.length ||
+      reportFilters.statuses?.length ||
+      reportFilters.labels?.length ||
+      (reportFilters.completionState && reportFilters.completionState !== "all")
+    ) {
+      captureEvent("partial_report_used", {
+        project_key: projectKey,
+        selected_epic_count: reportFilters.selectedEpicKeys?.length || 0,
+        status_filter_count: reportFilters.statuses?.length || 0,
+        label_filter_count: reportFilters.labels?.length || 0,
+        completion_state: reportFilters.completionState || "all",
+      });
+    }
     loadLastWeekHours(payload);
   } catch (error) {
     exportActions.classList.add("hidden");
@@ -2026,6 +2058,10 @@ form.addEventListener("submit", async (event) => {
     downloadPdfButton.disabled = true;
     renderError(error.payload, error.message);
     setStatus(error.message, true);
+    captureEvent("report_generation_failed", {
+      stage: "report",
+      status_code: error?.payload?.debug?.status || null,
+    });
   }
 });
 
