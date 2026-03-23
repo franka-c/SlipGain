@@ -83,6 +83,7 @@ let currentUser = null;
 let approvedUsers = [];
 let pendingRequests = [];
 let passwordRecoveryMode = false;
+let posthogEnabled = false;
 const defaultAuthCopy = authCopy?.textContent || "";
 const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
 let inactivityTimeoutId = null;
@@ -194,6 +195,53 @@ function setButtonLoading(button, isLoading, loadingLabel) {
   button.disabled = isLoading;
   button.classList.toggle("button-loading", isLoading);
   button.textContent = isLoading ? loadingLabel : button.dataset.defaultLabel;
+}
+
+function initPosthog(config) {
+  if (!config?.posthogKey || !window.posthog) {
+    posthogEnabled = false;
+    return;
+  }
+
+  window.posthog.init(config.posthogKey, {
+    api_host: config.posthogHost || "https://eu.i.posthog.com",
+    person_profiles: "identified_only",
+    capture_pageview: false,
+    capture_pageleave: false,
+    autocapture: false,
+    session_recording: {
+      enabled: false,
+    },
+  });
+
+  posthogEnabled = true;
+}
+
+function captureEvent(eventName, properties = {}) {
+  if (!posthogEnabled || !window.posthog) {
+    return;
+  }
+
+  window.posthog.capture(eventName, properties);
+}
+
+function identifyPosthogUser(user) {
+  if (!posthogEnabled || !window.posthog || !user?.email) {
+    return;
+  }
+
+  window.posthog.identify(user.email, {
+    email_domain: user.email.split("@")[1] || "",
+    role: user.role || "user",
+  });
+}
+
+function resetPosthogUser() {
+  if (!posthogEnabled || !window.posthog) {
+    return;
+  }
+
+  window.posthog.reset();
 }
 
 function clearInactivityTimeout() {
@@ -450,6 +498,7 @@ async function loadCurrentUser() {
 
   const data = await requestJson("/api/me");
   currentUser = data.user || null;
+  identifyPosthogUser(currentUser);
   updateFilterMenuState();
   return currentUser;
 }
@@ -1279,6 +1328,12 @@ async function loadTrendData() {
     latestTrendData = data.trends || null;
     renderTrendChart();
     setStatus("Historical graph loaded.");
+    captureEvent("graph_loaded", {
+      trend_view: activeTrendView,
+      cached: Boolean(data.cached),
+      start_date: trendStartDate || "",
+      end_date: trendEndDate || "",
+    });
   } catch (error) {
     latestTrendData = null;
     renderTrendEmptyState("Could not load the historical graph for this date range.");
@@ -1401,6 +1456,11 @@ async function loadProjects() {
         ? `Loaded ${data.projects.length} projects. Choose one to load its epic filters.`
         : "No Jira projects were returned for this account."
     );
+    if (hasProjects) {
+      captureEvent("projects_loaded", {
+        project_count: data.projects.length,
+      });
+    }
   } catch (error) {
     loadedProjects = [];
     projectPickerGroup.classList.add("hidden");
@@ -1488,6 +1548,10 @@ function exportCsv() {
   }
 
   setStatus("CSV opened in a new tab. Save it from there if it does not download automatically.");
+  captureEvent("csv_exported", {
+    row_count: latestRows.length,
+    project_title: latestRenderedSummary.projectTitle || "",
+  });
   setTimeout(() => {
     URL.revokeObjectURL(url);
   }, 60000);
@@ -1665,6 +1729,11 @@ function downloadPdf() {
   }
 
   setStatus("PDF view opened in a new tab.");
+  captureEvent("pdf_exported", {
+    row_count: latestRows.length,
+    project_title: latestRenderedSummary.projectTitle || "",
+    trend_view: activeTrendView,
+  });
   setTimeout(() => {
     URL.revokeObjectURL(url);
   }, 60000);
@@ -1694,6 +1763,7 @@ async function updateAuthState(session) {
     adminSection.classList.add("hidden");
     updateFilterMenuState();
     closeMenu();
+    resetPosthogUser();
     return;
   }
 
@@ -1819,6 +1889,10 @@ async function handleSignIn(event) {
   setAuthStatus("Signed in.");
   try {
     await updateAuthState(data.session);
+    captureEvent("login_succeeded", {
+      role: currentUser?.role || "user",
+      managed_auth: managedAuth,
+    });
     navigateTo("/");
     if (managedAuth) {
       await loadProjects();
@@ -1934,6 +2008,17 @@ form.addEventListener("submit", async (event) => {
     exportButton.disabled = data.rows.length === 0;
     downloadPdfButton.disabled = data.rows.length === 0;
     setStatus(`Report ready. ${data.rows.length} epics included.`);
+    const reportFilters = getReportFilters();
+    captureEvent("report_generated", {
+      project_key: projectKey,
+      epic_count: data.rows.length,
+      filtered: Boolean(
+        reportFilters.selectedEpicKeys?.length ||
+          reportFilters.statuses?.length ||
+          reportFilters.labels?.length ||
+          (reportFilters.completionState && reportFilters.completionState !== "all")
+      ),
+    });
     loadLastWeekHours(payload);
   } catch (error) {
     exportActions.classList.add("hidden");
@@ -1950,6 +2035,10 @@ adminButton.addEventListener("click", async () => {
     setAdminStatus("Loading approved users...");
     await loadApprovedUsers();
     setAdminStatus("Approved users loaded.");
+    captureEvent("admin_opened", {
+      approved_user_count: approvedUsers.length,
+      pending_request_count: pendingRequests.length,
+    });
     openAdminSection();
   } catch (error) {
     setAdminStatus(error.message, true);
@@ -2061,6 +2150,10 @@ adminRequestsBody.addEventListener("click", async (event) => {
     });
     await loadApprovedUsers();
     setAdminStatus("Request approved.");
+    captureEvent("approval_granted", {
+      approved_email_domain: email.split("@")[1] || "",
+      role: "user",
+    });
   } catch (error) {
     setAdminStatus(error.message, true);
   }
@@ -2111,6 +2204,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     const config = await fetchConfig();
     applyManagedAuthUi(config);
+    initPosthog(config);
     setPasswordRecoveryMode(hasRecoveryHash());
     bindInactivityListeners();
 
