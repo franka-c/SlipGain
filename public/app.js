@@ -4,6 +4,9 @@ const authCard = document.getElementById("auth-card");
 const appShell = document.getElementById("app-shell");
 const authStatusEl = document.getElementById("auth-status");
 const authCopy = document.getElementById("auth-copy");
+const authInfoButton = document.getElementById("auth-info-button");
+const authInfoModal = document.getElementById("auth-info-modal");
+const authInfoClose = document.getElementById("auth-info-close");
 const authLayout = document.getElementById("auth-layout");
 const signupForm = document.getElementById("signup-form");
 const signinForm = document.getElementById("signin-form");
@@ -113,6 +116,14 @@ function getTrendControlPayload() {
 function closeMenu() {
   menuPanel.classList.add("hidden");
   menuToggle.setAttribute("aria-expanded", "false");
+}
+
+function openAuthInfoModal() {
+  authInfoModal?.classList.remove("hidden");
+}
+
+function closeAuthInfoModal() {
+  authInfoModal?.classList.add("hidden");
 }
 
 function updateFilterMenuState() {
@@ -2127,6 +2138,8 @@ signupForm.addEventListener("submit", handleSignUp);
 signinForm.addEventListener("submit", handleSignIn);
 resetPasswordForm.addEventListener("submit", handleResetPassword);
 forgotPasswordButton.addEventListener("click", handleForgotPassword);
+authInfoButton?.addEventListener("click", openAuthInfoModal);
+authInfoClose?.addEventListener("click", closeAuthInfoModal);
 projectSelect.addEventListener("change", loadEpicFilters);
 partialFilterSection.addEventListener("change", (event) => {
   if (event.target.closest("#epic-options")) {
@@ -2223,9 +2236,18 @@ document.addEventListener("click", (event) => {
   if (!accountMenuWrap.contains(event.target)) {
     closeMenu();
   }
+
+  if (event.target === authInfoModal) {
+    closeAuthInfoModal();
+  }
 });
 
 window.addEventListener("popstate", applyRouteVisibility);
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeAuthInfoModal();
+  }
+});
 
 document.addEventListener("DOMContentLoaded", async () => {
   const today = new Date().toISOString().slice(0, 10);

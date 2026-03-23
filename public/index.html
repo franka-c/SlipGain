@@ -15,9 +15,17 @@
         <div class="section-head login-head">
           <div>
             <p class="eyebrow">Access</p>
-            <h2>Sign In</h2>
+            <div class="auth-title-row">
+              <h2>Sign Up</h2>
+              <button
+                type="button"
+                id="auth-info-button"
+                class="auth-info-button"
+                aria-label="Show sign up information"
+                aria-haspopup="dialog"
+              >i</button>
+            </div>
           </div>
-          <p id="auth-copy" class="section-copy">Use your `@decode.agency` email to create an account, confirm it from the email link in your inbox, and then sign in.</p>
         </div>
 
         <div class="auth-layout" id="auth-layout">
@@ -88,6 +96,16 @@
 
         <p id="auth-status" class="status">Authentication is required for this deployment.</p>
       </section>
+
+      <div id="auth-info-modal" class="auth-info-modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-info-title">
+        <div class="auth-info-dialog">
+          <div class="auth-info-head">
+            <h3 id="auth-info-title">Access Information</h3>
+            <button type="button" id="auth-info-close" class="auth-info-close" aria-label="Close information dialog">×</button>
+          </div>
+          <p id="auth-copy" class="section-copy">Use your `@decode.agency` email to create an account, confirm it from the email link in your inbox, and then log in.</p>
+        </div>
+      </div>
 
       <section class="hidden" id="app-shell">
       <section class="hero">
