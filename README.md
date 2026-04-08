@@ -112,8 +112,24 @@ To enable PostHog analytics for the web app, set:
 
 The app exposes these values to the frontend through `/api/config` and initializes PostHog only when `POSTHOG_KEY` is present.
 
+Pageview tracking:
+
+- The app captures manual PostHog `$pageview` events on initial load.
+- It also captures `$pageview` on in-app route changes such as `/` and `/admin`.
+- This is enabled to make PostHog's default web dashboards useful without turning on broad autocapture.
+- Reference: [PostHog JavaScript SDK docs](https://posthog.com/docs/libraries/js)
+
 Current PostHog events implemented:
 
+- `$pageview`
+  Properties:
+  - `path`
+  - `full_path`
+  - `route_name`
+  - `is_admin_route`
+  - `managed_auth`
+  - `auth_enabled`
+  - `project_key`
 - `login_succeeded`
   Properties:
   - `role`
