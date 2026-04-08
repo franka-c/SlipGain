@@ -91,6 +91,7 @@ const defaultAuthCopy = authCopy?.textContent || "";
 const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
 let inactivityTimeoutId = null;
 let inactivityListenersBound = false;
+let lastCapturedPagePath = null;
 
 function isAdminRoute() {
   return window.location.pathname === "/admin";
@@ -99,12 +100,14 @@ function isAdminRoute() {
 function navigateTo(path) {
   if (window.location.pathname === path) {
     applyRouteVisibility();
+    capturePageview();
     closeMenu();
     return;
   }
 
   window.history.pushState({}, "", path);
   applyRouteVisibility();
+  capturePageview();
   closeMenu();
 }
 
@@ -236,6 +239,36 @@ function captureEvent(eventName, properties = {}) {
   window.posthog.capture(eventName, properties);
 }
 
+function getRouteName() {
+  if (isAdminRoute()) {
+    return "admin";
+  }
+
+  return "report";
+}
+
+function capturePageview({ force = false } = {}) {
+  if (!posthogEnabled || !window.posthog) {
+    return;
+  }
+
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+  if (!force && currentPath === lastCapturedPagePath) {
+    return;
+  }
+
+  lastCapturedPagePath = currentPath;
+  window.posthog.capture("$pageview", {
+    path: window.location.pathname,
+    full_path: currentPath,
+    route_name: getRouteName(),
+    is_admin_route: isAdminRoute(),
+    managed_auth: managedAuth,
+    auth_enabled: authEnabled,
+    project_key: projectSelect?.value || "",
+  });
+}
+
 function identifyPosthogUser(user) {
   if (!posthogEnabled || !window.posthog || !user?.email) {
     return;
@@ -253,6 +286,7 @@ function resetPosthogUser() {
   }
 
   window.posthog.reset();
+  lastCapturedPagePath = null;
 }
 
 function clearInactivityTimeout() {
@@ -2242,7 +2276,10 @@ document.addEventListener("click", (event) => {
   }
 });
 
-window.addEventListener("popstate", applyRouteVisibility);
+window.addEventListener("popstate", () => {
+  applyRouteVisibility();
+  capturePageview({ force: true });
+});
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAuthInfoModal();
@@ -2290,6 +2327,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadProjects();
       }
       applyRouteVisibility();
+      capturePageview({ force: true });
       return;
     }
 
@@ -2298,9 +2336,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       await loadProjects();
     }
     applyRouteVisibility();
+    capturePageview({ force: true });
   } catch {
     await updateAuthState(null);
     applyRouteVisibility();
+    capturePageview({ force: true });
   }
 });
 
