@@ -1691,15 +1691,18 @@ function downloadPdf() {
           body { font-family: "Avenir Next", "Segoe UI", sans-serif; margin: 24px; color: #1d232b; }
           h1, h2, p { margin: 0; }
           .page { display: grid; gap: 18px; }
-          .topbar { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #d9e4f6; padding-bottom: 14px; }
+          .topbar { display: flex; justify-content: space-between; align-items: start; gap: 24px; border-bottom: 2px solid #d9e4f6; padding-bottom: 14px; }
           .title-block small, .label { color: #5a6472; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
           .title-block h1 { margin-top: 6px; font-size: 30px; line-height: 1; }
-          .summary-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; }
+          .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
           .card { border: 1px solid #d7dee8; border-radius: 16px; padding: 16px; }
           .card h2 { font-size: 16px; margin-bottom: 12px; }
-          .meta-grid, .metric-grid { display: grid; gap: 10px; }
-          .meta-item, .metric-item { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
-          .metric-item strong, .meta-item strong { font-size: 14px; }
+          .meta-grid { display: grid; gap: 8px; min-width: 260px; }
+          .metric-grid { display: grid; gap: 10px; }
+          .meta-item, .metric-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; font-size: 14px; }
+          .metric-item span, .meta-item span { line-height: 1.35; }
+          .metric-item strong, .meta-item strong { font-size: 14px; text-align: right; justify-self: end; white-space: nowrap; }
+          .slip-value { text-align: right; justify-self: end; white-space: nowrap; }
           .trend-shell { display: grid; gap: 14px; }
           .trend-copy { margin-top: 4px; color: #5a6472; font-size: 13px; }
           .trend-legend { display: flex; flex-wrap: wrap; gap: 12px 16px; margin-bottom: 10px; }
@@ -1742,7 +1745,7 @@ function downloadPdf() {
                     ([label, amount, pct]) => `
                       <div class="metric-item">
                         <span>${escapeHtml(label)}</span>
-                        <strong>${escapeHtml(amount)} / ${escapeHtml(pct)}</strong>
+                        <strong class="slip-value">${escapeHtml(amount)} / ${escapeHtml(pct)}</strong>
                       </div>
                     `
                   )
