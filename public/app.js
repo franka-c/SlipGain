@@ -30,6 +30,10 @@ const emailGroup = document.getElementById("email-group");
 const tokenGroup = document.getElementById("token-group");
 const loadProjectsGroup = document.getElementById("load-projects-group");
 const projectPickerGroup = document.getElementById("project-picker-group");
+const filterDisclosure = document.getElementById("filter-disclosure");
+const filterToggleButton = document.getElementById("filter-toggle-button");
+const filterToggleSummary = document.getElementById("filter-toggle-summary");
+const filterToggleIcon = document.getElementById("filter-toggle-icon");
 const generateActionGroup = document.getElementById("generate-action-group");
 const projectEmptyState = document.getElementById("project-empty-state");
 const projectSelect = document.getElementById("projectKey");
@@ -91,6 +95,7 @@ const defaultAuthCopy = authCopy?.textContent || "";
 const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
 let inactivityTimeoutId = null;
 let inactivityListenersBound = false;
+let partialFiltersExpanded = false;
 
 function isAdminRoute() {
   return window.location.pathname === "/admin";
@@ -137,6 +142,51 @@ function updateFilterMenuState() {
     currentUser?.role !== "admin" || onAdminRoute
   );
   reportButton.classList.toggle("hidden", !onAdminRoute);
+}
+
+function setPartialFiltersExpanded(isExpanded) {
+  partialFiltersExpanded = Boolean(isExpanded);
+  partialFilterSection.classList.toggle("hidden", !partialFiltersExpanded);
+  filterToggleButton?.setAttribute("aria-expanded", String(partialFiltersExpanded));
+  if (filterToggleIcon) {
+    filterToggleIcon.textContent = partialFiltersExpanded ? "−" : "+";
+  }
+}
+
+function updateFilterToggleSummary() {
+  if (!filterToggleSummary) {
+    return;
+  }
+
+  if (!latestEpicFilters?.epics?.length) {
+    filterToggleSummary.textContent = "Optional filters are currently off.";
+    return;
+  }
+
+  const filters = getReportFilters();
+  const parts = [];
+
+  if (filters.completionState === "completed") {
+    parts.push("Completed only");
+  } else if (filters.completionState === "incomplete") {
+    parts.push("Incomplete only");
+  }
+
+  if (filters.statuses.length > 0) {
+    parts.push(`${filters.statuses.length} status filter${filters.statuses.length === 1 ? "" : "s"}`);
+  }
+
+  if (filters.labels.length > 0) {
+    parts.push(`${filters.labels.length} label filter${filters.labels.length === 1 ? "" : "s"}`);
+  }
+
+  const selectedEpics = filters.selectedEpicKeys.length;
+  if (selectedEpics > 0 && selectedEpics < latestEpicFilters.epics.length) {
+    parts.push(`${selectedEpics} epic${selectedEpics === 1 ? "" : "s"} selected`);
+  }
+
+  filterToggleSummary.textContent =
+    parts.length > 0 ? parts.join(" • ") : "Optional filters are currently off.";
 }
 
 function setStatus(message, isError = false, isLoading = false) {
@@ -1294,17 +1344,20 @@ function renderEpicOptions() {
 
   syncSelectedEpicKeysState();
   updateEpicSelectionCount();
+  updateFilterToggleSummary();
 }
 
 function resetPartialFilters() {
   latestEpicFilters = null;
   selectedEpicKeysState = null;
-  partialFilterSection.classList.add("hidden");
+  filterDisclosure.classList.add("hidden");
+  setPartialFiltersExpanded(false);
   completionStateSelect.value = "all";
   statusOptions.innerHTML = "";
   labelOptions.innerHTML = "";
   epicOptions.innerHTML = "";
   epicSelectionCount.textContent = "All loaded epics are currently included.";
+  updateFilterToggleSummary();
   updateFilterMenuState();
 }
 
@@ -1384,7 +1437,9 @@ function renderPartialFilters(epicPayload) {
     new Set()
   );
   renderEpicOptions();
-  partialFilterSection.classList.toggle("hidden", epicPayload.epics.length === 0);
+  filterDisclosure.classList.toggle("hidden", epicPayload.epics.length === 0);
+  setPartialFiltersExpanded(false);
+  updateFilterToggleSummary();
   updateFilterMenuState();
 }
 
@@ -1393,9 +1448,10 @@ function showPartialFilters() {
     return;
   }
 
-  partialFilterSection.classList.remove("hidden");
+  filterDisclosure.classList.remove("hidden");
+  setPartialFiltersExpanded(true);
   closeMenu();
-  partialFilterSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  filterDisclosure.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function getSelectedEpicKeys() {
@@ -1472,6 +1528,7 @@ async function loadProjects() {
     renderProjectOptions(loadedProjects);
     const hasProjects = data.projects.length > 0;
     projectPickerGroup.classList.toggle("hidden", !hasProjects);
+    filterDisclosure.classList.add("hidden");
     generateActionGroup.classList.add("hidden");
     projectEmptyState.classList.toggle("hidden", hasProjects);
     setStatus(
@@ -2141,15 +2198,24 @@ forgotPasswordButton.addEventListener("click", handleForgotPassword);
 authInfoButton?.addEventListener("click", openAuthInfoModal);
 authInfoClose?.addEventListener("click", closeAuthInfoModal);
 projectSelect.addEventListener("change", loadEpicFilters);
+filterToggleButton?.addEventListener("click", () => {
+  if (!latestEpicFilters?.epics?.length) {
+    return;
+  }
+
+  setPartialFiltersExpanded(!partialFiltersExpanded);
+});
 partialFilterSection.addEventListener("change", (event) => {
   if (event.target.closest("#epic-options")) {
     syncSelectedEpicKeysState();
     updateEpicSelectionCount();
+    updateFilterToggleSummary();
     return;
   }
 
   if (event.target.matches('[data-filter-kind="status"], [data-filter-kind="label"], #completion-state')) {
     renderEpicOptions();
+    updateFilterToggleSummary();
   }
 });
 selectAllEpicsButton.addEventListener("click", () => {
@@ -2158,6 +2224,7 @@ selectAllEpicsButton.addEventListener("click", () => {
   }
   syncSelectedEpicKeysState();
   updateEpicSelectionCount();
+  updateFilterToggleSummary();
 });
 clearAllEpicsButton.addEventListener("click", () => {
   for (const input of epicOptions.querySelectorAll('input[type="checkbox"]')) {
@@ -2165,6 +2232,7 @@ clearAllEpicsButton.addEventListener("click", () => {
   }
   syncSelectedEpicKeysState();
   updateEpicSelectionCount();
+  updateFilterToggleSummary();
 });
 adminUsersBody.addEventListener("click", (event) => {
   const button = event.target.closest(".admin-edit-button");
