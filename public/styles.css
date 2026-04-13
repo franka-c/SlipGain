@@ -649,7 +649,7 @@ button:disabled {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 18px;
   text-align: left;
 }
 
