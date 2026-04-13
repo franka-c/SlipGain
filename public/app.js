@@ -1651,6 +1651,12 @@ function downloadPdf() {
     ["Slip/gain only completed work", formatHours(summary.slipGainCompletedOnly), formatPercent(summary.slipGainCompletedOnlyPct)],
   ];
 
+  const estimateItems = [
+    ["Original estimate", formatHours(summary.totalOriginalEstimate)],
+    ["Remaining estimate", formatHours(summary.totalRemainingEstimate)],
+    ["Total time spent", formatHours(summary.totalTimeSpent)],
+  ];
+
   const metricRows = [
     ["Time spent", formatPercent(summary.timeSpentMetric)],
     ["Time passed", summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric)],
@@ -1737,6 +1743,21 @@ function downloadPdf() {
                       <div class="metric-item">
                         <span>${escapeHtml(label)}</span>
                         <strong>${escapeHtml(amount)} / ${escapeHtml(pct)}</strong>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </div>
+            <div class="card">
+              <h2>Totals / Estimate Snapshot</h2>
+              <div class="metric-grid">
+                ${estimateItems
+                  .map(
+                    ([label, value]) => `
+                      <div class="metric-item">
+                        <span>${escapeHtml(label)}</span>
+                        <strong>${escapeHtml(value)}</strong>
                       </div>
                     `
                   )
