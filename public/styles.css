@@ -634,6 +634,48 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+.filter-disclosure {
+  display: grid;
+  gap: 12px;
+}
+
+.filter-toggle-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  text-align: left;
+}
+
+.filter-toggle-button strong {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: 500;
+}
+
+.filter-toggle-summary {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.filter-toggle-icon {
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  color: var(--accent);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
 .inline-note {
   margin: -4px 0 0;
   color: var(--muted);
@@ -645,6 +687,13 @@ button:disabled {
   grid-template-columns: 0.9fr 1.1fr;
   gap: 18px;
   align-items: start;
+}
+
+.partial-filter-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
 }
 
 .filter-group {

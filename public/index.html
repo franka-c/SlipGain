@@ -164,6 +164,63 @@
             </select>
           </label>
 
+          <div class="project-picker hidden filter-disclosure" id="filter-disclosure">
+            <button
+              type="button"
+              id="filter-toggle-button"
+              class="filter-toggle-button"
+              aria-expanded="false"
+              aria-controls="partial-filter-section"
+            >
+              <span>
+                <strong>Epic Filters</strong>
+                <span id="filter-toggle-summary" class="filter-toggle-summary">Optional filters are currently off.</span>
+              </span>
+              <span id="filter-toggle-icon" class="filter-toggle-icon">+</span>
+            </button>
+
+            <div class="hidden partial-filter-card" id="partial-filter-section">
+              <div class="partial-filter-layout">
+                <label>
+                  Completion State
+                  <select id="completion-state">
+                    <option value="all">All epics</option>
+                    <option value="completed">Completed only</option>
+                    <option value="incomplete">Incomplete only</option>
+                  </select>
+                </label>
+
+                <div class="filter-group">
+                  <div class="filter-head">
+                    <span>Status</span>
+                    <button type="button" class="mini-action" data-filter-clear="status">Clear</button>
+                  </div>
+                  <div class="filter-options" id="status-options"></div>
+                </div>
+
+                <div class="filter-group">
+                  <div class="filter-head">
+                    <span>Labels</span>
+                    <button type="button" class="mini-action" data-filter-clear="label">Clear</button>
+                  </div>
+                  <div class="filter-options" id="label-options"></div>
+                </div>
+
+                <div class="filter-group epic-picker-group">
+                  <div class="filter-head">
+                    <span>Epics</span>
+                    <div class="mini-action-row">
+                      <button type="button" class="mini-action" id="select-all-epics">Select all</button>
+                      <button type="button" class="mini-action" id="clear-all-epics">Clear</button>
+                    </div>
+                  </div>
+                  <p class="inline-note" id="epic-selection-count">All loaded epics are currently included.</p>
+                  <div class="filter-options epic-options" id="epic-options"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <p id="project-empty-state" class="inline-note hidden">No projects available for this Jira account.</p>
 
           <div class="actions actions-wide hidden" id="generate-action-group">
@@ -177,55 +234,6 @@
         </div>
 
         <p id="status" class="status">Enter your Jira details to begin.</p>
-      </section>
-
-      <section class="card hidden partial-filter-card" id="partial-filter-section">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Partial Report</p>
-            <h2>Epic Filters</h2>
-          </div>
-          <p class="section-copy">Limit the report to selected epics or matching Jira slices before you generate it.</p>
-        </div>
-
-        <div class="partial-filter-layout">
-          <label>
-            Completion State
-            <select id="completion-state">
-              <option value="all">All epics</option>
-              <option value="completed">Completed only</option>
-              <option value="incomplete">Incomplete only</option>
-            </select>
-          </label>
-
-          <div class="filter-group">
-            <div class="filter-head">
-              <span>Status</span>
-              <button type="button" class="mini-action" data-filter-clear="status">Clear</button>
-            </div>
-            <div class="filter-options" id="status-options"></div>
-          </div>
-
-          <div class="filter-group">
-            <div class="filter-head">
-              <span>Labels</span>
-              <button type="button" class="mini-action" data-filter-clear="label">Clear</button>
-            </div>
-            <div class="filter-options" id="label-options"></div>
-          </div>
-
-          <div class="filter-group epic-picker-group">
-            <div class="filter-head">
-              <span>Epics</span>
-              <div class="mini-action-row">
-                <button type="button" class="mini-action" id="select-all-epics">Select all</button>
-                <button type="button" class="mini-action" id="clear-all-epics">Clear</button>
-              </div>
-            </div>
-            <p class="inline-note" id="epic-selection-count">All loaded epics are currently included.</p>
-            <div class="filter-options epic-options" id="epic-options"></div>
-          </div>
-        </div>
       </section>
 
       <section class="card hidden input-focus-card" id="report-metadata-section">
