@@ -159,10 +159,39 @@
           </div>
 
           <label class="project-picker hidden" id="project-picker-group">
-            Project
-            <select id="projectKey" name="projectKey" required>
+            <span id="project-picker-label">Project</span>
+            <select id="projectKey" name="projectKey" required class="project-picker-native">
               <option value="">Load projects first</option>
             </select>
+            <div class="project-combobox" id="project-combobox">
+              <button
+                type="button"
+                id="project-combobox-toggle"
+                class="project-combobox-toggle"
+                aria-expanded="false"
+                aria-haspopup="listbox"
+                aria-controls="project-combobox-panel"
+              >
+                <span class="project-combobox-toggle-copy">
+                  <span id="project-combobox-value" class="project-combobox-value">Select a project</span>
+                  <span id="project-combobox-meta" class="project-combobox-meta">Load projects first</span>
+                </span>
+                <span class="project-combobox-caret" aria-hidden="true">▾</span>
+              </button>
+
+              <div class="project-combobox-panel hidden" id="project-combobox-panel">
+                <input
+                  type="search"
+                  id="project-combobox-search"
+                  class="project-combobox-search"
+                  placeholder="Search projects"
+                  aria-label="Search projects"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <div class="project-combobox-options" id="project-combobox-options" role="listbox"></div>
+              </div>
+            </div>
           </label>
 
           <div class="project-picker hidden filter-disclosure" id="filter-disclosure">

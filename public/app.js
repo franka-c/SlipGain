@@ -30,6 +30,13 @@ const emailGroup = document.getElementById("email-group");
 const tokenGroup = document.getElementById("token-group");
 const loadProjectsGroup = document.getElementById("load-projects-group");
 const projectPickerGroup = document.getElementById("project-picker-group");
+const projectCombobox = document.getElementById("project-combobox");
+const projectComboboxToggle = document.getElementById("project-combobox-toggle");
+const projectComboboxValue = document.getElementById("project-combobox-value");
+const projectComboboxMeta = document.getElementById("project-combobox-meta");
+const projectComboboxPanel = document.getElementById("project-combobox-panel");
+const projectComboboxSearch = document.getElementById("project-combobox-search");
+const projectComboboxOptions = document.getElementById("project-combobox-options");
 const filterDisclosure = document.getElementById("filter-disclosure");
 const filterToggleButton = document.getElementById("filter-toggle-button");
 const filterToggleSummary = document.getElementById("filter-toggle-summary");
@@ -96,6 +103,9 @@ const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
 let inactivityTimeoutId = null;
 let inactivityListenersBound = false;
 let partialFiltersExpanded = false;
+let projectComboboxExpanded = false;
+let filteredProjects = [];
+let activeProjectOptionIndex = -1;
 
 function isAdminRoute() {
   return window.location.pathname === "/admin";
@@ -1150,6 +1160,10 @@ function renderProjectOptions(projects) {
     option.textContent = `${project.name} (${project.key})`;
     projectSelect.appendChild(option);
   }
+
+  projectSelect.value = "";
+  syncProjectComboboxSelection();
+  renderProjectComboboxOptions("");
 }
 
 function applyManagedAuthUi(config) {
@@ -1184,6 +1198,127 @@ function applyManagedAuthUi(config) {
 
 function getSelectedProject() {
   return loadedProjects.find((project) => project.key === projectSelect.value) || null;
+}
+
+function getFilteredProjects(query = "") {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return [...loadedProjects];
+  }
+
+  return loadedProjects.filter((project) =>
+    `${project.name} ${project.key}`.toLowerCase().includes(normalizedQuery)
+  );
+}
+
+function getDefaultActiveProjectIndex(projects) {
+  if (!projects.length) {
+    return -1;
+  }
+
+  const selectedIndex = projects.findIndex((project) => project.key === projectSelect.value);
+  return selectedIndex >= 0 ? selectedIndex : 0;
+}
+
+function syncProjectComboboxSelection() {
+  const selectedProject = getSelectedProject();
+  const hasSelection = Boolean(selectedProject);
+
+  projectComboboxValue.textContent = hasSelection ? selectedProject.name : "Select a project";
+  projectComboboxMeta.textContent = hasSelection
+    ? selectedProject.key
+    : loadedProjects.length > 0
+      ? "Search and choose from loaded projects"
+      : "Load projects first";
+  projectComboboxToggle.classList.toggle("is-placeholder", !hasSelection);
+}
+
+function renderProjectComboboxOptions(query = projectComboboxSearch?.value || "") {
+  filteredProjects = getFilteredProjects(query);
+
+  if (!filteredProjects.length) {
+    activeProjectOptionIndex = -1;
+    projectComboboxOptions.innerHTML =
+      '<p class="project-combobox-empty">No projects match your search.</p>';
+    return;
+  }
+
+  if (activeProjectOptionIndex < 0 || activeProjectOptionIndex >= filteredProjects.length) {
+    activeProjectOptionIndex = getDefaultActiveProjectIndex(filteredProjects);
+  }
+
+  const selectedKey = projectSelect.value;
+  projectComboboxOptions.innerHTML = filteredProjects
+    .map((project, index) => {
+      const isSelected = project.key === selectedKey;
+      const isActive = index === activeProjectOptionIndex;
+
+      return `
+        <button
+          type="button"
+          id="project-combobox-option-${escapeHtml(project.key)}"
+          class="project-combobox-option${isSelected ? " is-selected" : ""}${isActive ? " is-active" : ""}"
+          role="option"
+          aria-selected="${isSelected ? "true" : "false"}"
+          data-project-key="${escapeHtml(project.key)}"
+        >
+          <span class="project-combobox-option-name">${escapeHtml(project.name)}</span>
+          <span class="project-combobox-option-key">${escapeHtml(project.key)}</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  const activeOption = projectComboboxOptions.querySelector(".project-combobox-option.is-active");
+  activeOption?.scrollIntoView({ block: "nearest" });
+}
+
+function setProjectComboboxExpanded(isExpanded, { focusSearch = false } = {}) {
+  projectComboboxExpanded = Boolean(isExpanded);
+  projectComboboxPanel.classList.toggle("hidden", !projectComboboxExpanded);
+  projectComboboxToggle.setAttribute("aria-expanded", String(projectComboboxExpanded));
+  projectComboboxToggle.classList.toggle("is-open", projectComboboxExpanded);
+
+  if (projectComboboxExpanded) {
+    projectComboboxSearch.value = "";
+    activeProjectOptionIndex = getDefaultActiveProjectIndex(loadedProjects);
+    renderProjectComboboxOptions("");
+    if (focusSearch) {
+      window.requestAnimationFrame(() => projectComboboxSearch.focus());
+    }
+    return;
+  }
+
+  projectComboboxSearch.value = "";
+  activeProjectOptionIndex = -1;
+}
+
+function selectProject(projectKey, { triggerChange = true } = {}) {
+  projectSelect.value = projectKey;
+  syncProjectComboboxSelection();
+  setProjectComboboxExpanded(false);
+  renderProjectComboboxOptions("");
+
+  if (triggerChange) {
+    projectSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+function moveProjectComboboxActiveOption(direction) {
+  if (!filteredProjects.length) {
+    return;
+  }
+
+  if (activeProjectOptionIndex < 0) {
+    activeProjectOptionIndex = getDefaultActiveProjectIndex(filteredProjects);
+  } else {
+    activeProjectOptionIndex = Math.min(
+      filteredProjects.length - 1,
+      Math.max(0, activeProjectOptionIndex + direction)
+    );
+  }
+
+  renderProjectComboboxOptions(projectComboboxSearch.value);
 }
 
 function renderCheckboxOptions(container, values, kind, checkedValues = null) {
@@ -1543,6 +1678,8 @@ async function loadProjects() {
     }
   } catch (error) {
     loadedProjects = [];
+    renderProjectOptions([]);
+    setProjectComboboxExpanded(false);
     projectPickerGroup.classList.add("hidden");
     generateActionGroup.classList.add("hidden");
     projectEmptyState.classList.add("hidden");
@@ -2221,7 +2358,100 @@ resetPasswordForm.addEventListener("submit", handleResetPassword);
 forgotPasswordButton.addEventListener("click", handleForgotPassword);
 authInfoButton?.addEventListener("click", openAuthInfoModal);
 authInfoClose?.addEventListener("click", closeAuthInfoModal);
-projectSelect.addEventListener("change", loadEpicFilters);
+projectSelect.addEventListener("change", () => {
+  syncProjectComboboxSelection();
+  loadEpicFilters();
+});
+projectComboboxToggle?.addEventListener("click", () => {
+  if (!loadedProjects.length) {
+    return;
+  }
+
+  setProjectComboboxExpanded(!projectComboboxExpanded, { focusSearch: !projectComboboxExpanded });
+});
+projectComboboxToggle?.addEventListener("keydown", (event) => {
+  if (!loadedProjects.length) {
+    return;
+  }
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    setProjectComboboxExpanded(true, { focusSearch: true });
+    return;
+  }
+
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    setProjectComboboxExpanded(true, { focusSearch: true });
+    activeProjectOptionIndex = loadedProjects.length - 1;
+    renderProjectComboboxOptions("");
+    return;
+  }
+
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    setProjectComboboxExpanded(!projectComboboxExpanded, { focusSearch: !projectComboboxExpanded });
+  }
+});
+projectComboboxSearch?.addEventListener("input", () => {
+  activeProjectOptionIndex = getDefaultActiveProjectIndex(getFilteredProjects(projectComboboxSearch.value));
+  renderProjectComboboxOptions(projectComboboxSearch.value);
+});
+projectComboboxSearch?.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    setProjectComboboxExpanded(false);
+    projectComboboxToggle.focus();
+    return;
+  }
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    moveProjectComboboxActiveOption(1);
+    return;
+  }
+
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    moveProjectComboboxActiveOption(-1);
+    return;
+  }
+
+  if (event.key === "Enter" && filteredProjects.length) {
+    event.preventDefault();
+    const activeProject = filteredProjects[Math.max(activeProjectOptionIndex, 0)];
+    if (activeProject) {
+      selectProject(activeProject.key);
+    }
+  }
+});
+projectComboboxOptions?.addEventListener("click", (event) => {
+  const button = event.target.closest(".project-combobox-option");
+  if (!button) {
+    return;
+  }
+
+  selectProject(button.dataset.projectKey);
+});
+projectComboboxOptions?.addEventListener("mouseover", (event) => {
+  const button = event.target.closest(".project-combobox-option");
+  if (!button) {
+    return;
+  }
+
+  const hoverIndex = filteredProjects.findIndex((project) => project.key === button.dataset.projectKey);
+  if (hoverIndex >= 0 && hoverIndex !== activeProjectOptionIndex) {
+    activeProjectOptionIndex = hoverIndex;
+    renderProjectComboboxOptions(projectComboboxSearch.value);
+  }
+});
+document.addEventListener("pointerdown", (event) => {
+  if (!projectComboboxExpanded || projectCombobox?.contains(event.target)) {
+    return;
+  }
+
+  setProjectComboboxExpanded(false);
+});
 filterToggleButton?.addEventListener("click", () => {
   if (!latestEpicFilters?.epics?.length) {
     return;
