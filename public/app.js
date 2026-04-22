@@ -1803,8 +1803,8 @@ function downloadPdf() {
                 <tr>
                   <th>Issue Key</th>
                   <th>Summary</th>
-                  <th>Original Estimate</th>
-                  <th>Remaining Estimate</th>
+                  <th>ORG EST</th>
+                  <th>REM EST</th>
                   <th>Time Spent</th>
                   <th>Slip/Gain</th>
                   <th>Progress</th>
