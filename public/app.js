@@ -85,7 +85,7 @@ let supabase = null;
 let accessToken = null;
 let latestEpicFilters = null;
 let selectedEpicKeysState = null;
-let activeTrendView = "monthly";
+let activeTrendView = "weekly";
 let currentUser = null;
 let approvedUsers = [];
 let pendingRequests = [];
@@ -1363,11 +1363,11 @@ function resetPartialFilters() {
 
 function resetTrendData() {
   latestTrendData = null;
-  activeTrendView = "monthly";
+  activeTrendView = "weekly";
   trendChart.innerHTML = "";
   trendSection.classList.add("hidden");
   trendToggleButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.trendView === "monthly");
+    button.classList.toggle("active", button.dataset.trendView === "weekly");
   });
   loadTrendButton.disabled = false;
 }
