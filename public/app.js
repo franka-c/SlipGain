@@ -80,6 +80,7 @@ const downloadPdfButton = document.getElementById("download-pdf");
 const loadProjectsButton = document.getElementById("load-projects");
 
 let latestRows = [];
+let sortState = { col: null, dir: "asc" };
 let loadedProjects = [];
 let latestBaseSummary = null;
 let latestRenderedSummary = null;
@@ -1099,8 +1100,43 @@ async function loadLastWeekHours(payload) {
   }
 }
 
+function sortedRows(rows) {
+  if (!sortState.col) return rows;
+  return [...rows].sort((a, b) => {
+    let av, bv;
+    if (sortState.col === "key") {
+      av = parseInt(a.issueKey.split("-")[1], 10) || 0;
+      bv = parseInt(b.issueKey.split("-")[1], 10) || 0;
+    } else if (sortState.col === "timeSpent") {
+      av = a.timeSpent;
+      bv = b.timeSpent;
+    } else if (sortState.col === "slipGain") {
+      av = a.slipGain;
+      bv = b.slipGain;
+    } else {
+      av = a.progress;
+      bv = b.progress;
+    }
+    if (av < bv) return sortState.dir === "asc" ? -1 : 1;
+    if (av > bv) return sortState.dir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll("th[data-sort]").forEach((th) => {
+    const indicator = th.querySelector(".sort-indicator");
+    if (!indicator) return;
+    if (th.dataset.sort === sortState.col) {
+      indicator.textContent = sortState.dir === "asc" ? " ↑" : " ↓";
+    } else {
+      indicator.textContent = " ↕";
+    }
+  });
+}
+
 function renderRows(rows) {
-  reportBody.innerHTML = rows
+  reportBody.innerHTML = sortedRows(rows)
     .map(
       (row) => `
         <tr>
@@ -2351,6 +2387,20 @@ adminUserForm.addEventListener("submit", async (event) => {
     setAdminStatus(error.message, true);
   }
 });
+document.querySelectorAll("th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.sort;
+    if (sortState.col === col) {
+      sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+    } else {
+      sortState.col = col;
+      sortState.dir = "asc";
+    }
+    updateSortHeaders();
+    if (latestRows.length > 0) renderRows(latestRows);
+  });
+});
+
 dismissErrorButton.addEventListener("click", hideError);
 signupForm.addEventListener("submit", handleSignUp);
 signinForm.addEventListener("submit", handleSignIn);

@@ -1210,6 +1210,20 @@ td:nth-child(2) {
   white-space: normal;
 }
 
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable-th:hover {
+  color: var(--fg);
+}
+
+.sort-indicator {
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
 .positive {
   color: var(--success);
   font-weight: 700;
