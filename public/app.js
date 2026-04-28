@@ -80,7 +80,7 @@ const downloadPdfButton = document.getElementById("download-pdf");
 const loadProjectsButton = document.getElementById("load-projects");
 
 let latestRows = [];
-let sortState = { col: null, dir: "asc" };
+let sortState = { col: "progress", dir: "desc" };
 let loadedProjects = [];
 let latestBaseSummary = null;
 let latestRenderedSummary = null;
@@ -1838,7 +1838,7 @@ function downloadPdf() {
     ["Projection of time spent till deadline", summary.projectedTimeSpentTillDeadline === null ? "Waiting for dates" : formatPercent(summary.projectedTimeSpentTillDeadline)],
   ];
 
-  const tableRows = latestRows
+  const tableRows = sortedRows(latestRows)
     .map(
       (row) => `
         <tr>
@@ -2626,6 +2626,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const reportCreationDateInput = document.getElementById("reportCreationDate");
 
   resetAllEditableInputs();
+  updateSortHeaders();
 
   if (reportCreationDateInput && !reportCreationDateInput.value) {
     reportCreationDateInput.value = today;
