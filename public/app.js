@@ -1918,7 +1918,7 @@ function downloadPdf() {
                     ([label, amount, pct]) => `
                       <div class="metric-item">
                         <span>${escapeHtml(label)}</span>
-                        <strong class="slip-value">${escapeHtml(amount)} / ${escapeHtml(pct)}</strong>
+                        <strong class="slip-value">${escapeHtml(pct)} (${escapeHtml(amount)}h)</strong>
                       </div>
                     `
                   )
