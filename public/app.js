@@ -77,6 +77,7 @@ const dismissErrorButton = document.getElementById("dismiss-error");
 const exportActions = document.getElementById("export-actions");
 const exportButton = document.getElementById("export-csv");
 const downloadPdfButton = document.getElementById("download-pdf");
+const refreshFromJiraButton = document.getElementById("refresh-from-jira");
 const loadProjectsButton = document.getElementById("load-projects");
 
 let latestRows = [];
@@ -1543,7 +1544,7 @@ function resetTrendData() {
   loadTrendButton.disabled = false;
 }
 
-async function loadTrendData() {
+async function loadTrendData({ refresh = false } = {}) {
   const { email, apiToken, projectKey } = getFormPayload();
   const { trendStartDate, trendEndDate } = getTrendControlPayload();
 
@@ -1565,6 +1566,7 @@ async function loadTrendData() {
         startDate: trendStartDate || undefined,
         endDate: trendEndDate || undefined,
       },
+      ...(refresh ? { refresh: true } : {}),
     });
 
     hideError();
@@ -2251,16 +2253,22 @@ async function handleResetPassword(event) {
 
 loadProjectsButton.addEventListener("click", loadProjects);
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+async function generateReport({ refresh = false } = {}) {
   const { email, apiToken, projectKey } = getFormPayload();
   const payload = {
     email,
     apiToken,
     projectKey,
     filters: getReportFilters(),
+    ...(refresh ? { refresh: true } : {}),
   };
-  setStatus("Generating report. This can take a while for large projects...", false, true);
+  setStatus(
+    refresh
+      ? "Refreshing report from Jira. This can take a while for large projects..."
+      : "Generating report. This can take a while for large projects...",
+    false,
+    true
+  );
   exportButton.disabled = true;
 
   try {
@@ -2317,6 +2325,7 @@ form.addEventListener("submit", async (event) => {
       });
     }
     loadLastWeekHours(payload);
+    return true;
   } catch (error) {
     exportActions.classList.add("hidden");
     exportButton.disabled = true;
@@ -2327,8 +2336,35 @@ form.addEventListener("submit", async (event) => {
       stage: "report",
       status_code: error?.payload?.debug?.status || null,
     });
+    return false;
   }
+}
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  generateReport();
 });
+
+async function refreshFromJira() {
+  const { projectKey } = getFormPayload();
+  if (!projectKey) {
+    setStatus("Generate a report before refreshing from Jira.", true);
+    return;
+  }
+
+  setButtonLoading(refreshFromJiraButton, true, "Refreshing...");
+  try {
+    const reportOk = await generateReport({ refresh: true });
+    if (reportOk && latestTrendData) {
+      await loadTrendData({ refresh: true });
+    }
+    captureEvent("refreshed_from_jira", { project_key: projectKey });
+  } finally {
+    setButtonLoading(refreshFromJiraButton, false);
+  }
+}
+
+refreshFromJiraButton.addEventListener("click", refreshFromJira);
 
 adjustFiltersButton.addEventListener("click", showPartialFilters);
 adminButton.addEventListener("click", async () => {
@@ -2369,7 +2405,7 @@ trendControlsForm.addEventListener("input", (event) => {
     event.target.dataset.userSet = "true";
   }
 });
-loadTrendButton.addEventListener("click", loadTrendData);
+loadTrendButton.addEventListener("click", () => loadTrendData());
 adminUserForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
