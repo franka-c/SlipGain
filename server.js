@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { URL } = require("url");
 const {
   handleAdminUsers,
@@ -64,6 +65,37 @@ function sendFile(res, filePath) {
   });
 }
 
+// Short content hash so index.html can reference /styles.css?v=<hash>. A
+// changed asset yields a new URL that no CDN/browser has cached, which defeats
+// cache layers (e.g. Cloudflare's Browser Cache TTL) that ignore no-cache.
+function assetVersion(fileName) {
+  try {
+    const content = fs.readFileSync(path.join(PUBLIC_DIR, fileName));
+    return crypto.createHash("md5").update(content).digest("hex").slice(0, 10);
+  } catch (error) {
+    return "0";
+  }
+}
+
+function sendIndexHtml(res) {
+  fs.readFile(path.join(PUBLIC_DIR, "index.html"), "utf8", (error, html) => {
+    if (error) {
+      sendJson(res, 404, { error: "Not found" });
+      return;
+    }
+
+    const versioned = html
+      .replace('href="/styles.css"', `href="/styles.css?v=${assetVersion("styles.css")}"`)
+      .replace('src="/app.js"', `src="/app.js?v=${assetVersion("app.js")}"`);
+
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-cache",
+    });
+    res.end(versioned);
+  });
+}
+
 function createServer() {
   return http.createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -113,11 +145,12 @@ function createServer() {
       return;
     }
 
-    const requestedPath =
-      url.pathname === "/" || url.pathname === "/admin"
-        ? "/index.html"
-        : url.pathname;
-    const filePath = path.join(PUBLIC_DIR, requestedPath);
+    if (url.pathname === "/" || url.pathname === "/admin") {
+      sendIndexHtml(res);
+      return;
+    }
+
+    const filePath = path.join(PUBLIC_DIR, url.pathname);
 
     if (!filePath.startsWith(PUBLIC_DIR)) {
       sendJson(res, 403, { error: "Forbidden" });
