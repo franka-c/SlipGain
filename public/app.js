@@ -80,6 +80,8 @@ const refreshFromJiraButton = document.getElementById("refresh-from-jira");
 const snapshotDateInput = document.getElementById("snapshotDate");
 const clearSnapshotButton = document.getElementById("clear-snapshot");
 const snapshotLabel = document.getElementById("snapshot-label");
+const bufferPercentInput = document.getElementById("bufferPercent");
+const bufferModeToggle = document.getElementById("buffer-mode-toggle");
 const loadProjectsButton = document.getElementById("load-projects");
 
 let latestRows = [];
@@ -366,9 +368,46 @@ function getSnapshotDate() {
   return snapshotDateInput?.value || "";
 }
 
+let bufferMode = "included";
+
+function bufferSettingsFrom(percentValue, mode) {
+  const percent = Number(percentValue);
+  const active = Number.isFinite(percent) && percent > 0;
+  return {
+    active,
+    percent: active ? percent : 0,
+    p: active ? percent / 100 : 0,
+    mode: mode === "add" ? "add" : "included",
+  };
+}
+
+function getBufferSettings() {
+  return bufferSettingsFrom(bufferPercentInput?.value, bufferMode);
+}
+
+// Returns { withBuffer, withoutBuffer, amount } for an estimate value.
+// "included" mode: the stored value already contains the buffer.
+// "add" mode: the stored value is the base and the buffer is added on top.
+function bufferPair(value, buffer) {
+  const v = Number(value) || 0;
+  if (!buffer.active) {
+    return { withBuffer: v, withoutBuffer: v, amount: 0 };
+  }
+  if (buffer.mode === "add") {
+    const withBuffer = v * (1 + buffer.p);
+    return { withBuffer, withoutBuffer: v, amount: withBuffer - v };
+  }
+  const withoutBuffer = v / (1 + buffer.p);
+  return { withBuffer: v, withoutBuffer, amount: v - withoutBuffer };
+}
+
 function getMetadataPayload() {
   const data = new FormData(reportMetadataForm);
-  return { ...Object.fromEntries(data.entries()), snapshotDate: getSnapshotDate() };
+  return {
+    ...Object.fromEntries(data.entries()),
+    snapshotDate: getSnapshotDate(),
+    bufferMode,
+  };
 }
 
 function resetReportMetadata(projectName = "") {
@@ -415,6 +454,12 @@ function resetReportMetadata(projectName = "") {
     snapshotDateInput.value = "";
   }
   updateSnapshotIndicator("");
+
+  if (bufferPercentInput) {
+    bufferPercentInput.value = "";
+  }
+  bufferMode = "included";
+  syncBufferModeButton();
 }
 
 function resetConfigInputs() {
@@ -691,6 +736,16 @@ function buildSummary(baseSummary, metadata) {
   const projectionReference = snapshotDate || reportCreationDate;
   const timeSpentLastWeek = Number(metadata.timeSpentLastWeek || 0);
 
+  const projectionNumerator =
+    projectionReference && deadline
+      ? (signedDaysBetween(projectionReference, deadline) / 7) * timeSpentLastWeek +
+        baseSummary.totalTimeSpent
+      : null;
+
+  const buffer = buildBufferView(baseSummary, metadata, {
+    projectionNumerator,
+  });
+
   return {
     ...baseSummary,
     projectTitle: metadata.projectTitle || "Not set",
@@ -709,12 +764,84 @@ function buildSummary(baseSummary, metadata) {
       baseSummary.totalTimeSpent + baseSummary.totalRemainingEstimate
     ),
     projectedTimeSpentTillDeadline:
-      projectionReference && deadline
-        ? safeRatio(
-            (signedDaysBetween(projectionReference, deadline) / 7) * timeSpentLastWeek + baseSummary.totalTimeSpent,
-            baseSummary.totalOriginalEstimate
-          )
-        : null,
+      projectionNumerator === null
+        ? null
+        : safeRatio(projectionNumerator, baseSummary.totalOriginalEstimate),
+    buffer,
+  };
+}
+
+// Computes the with-buffer / without-buffer variants of every original-estimate
+// derived metric, using the exact per-epic rows so filtered slip/gain subsets
+// stay correct. Returns { active: false } when the buffer feature is off.
+function buildBufferView(baseSummary, metadata, { projectionNumerator }) {
+  const buffer = bufferSettingsFrom(metadata.bufferPercent, metadata.bufferMode);
+  if (!buffer.active) {
+    return { active: false, mode: buffer.mode, percent: 0 };
+  }
+
+  const rows = latestRows || [];
+  const acc = {
+    origWith: 0,
+    origWithout: 0,
+    amount: 0,
+    all: { withBuffer: 0, withoutBuffer: 0 },
+    withoutUnestimated: { withBuffer: 0, withoutBuffer: 0 },
+    completedOnly: { withBuffer: 0, withoutBuffer: 0 },
+  };
+
+  for (const row of rows) {
+    const op = bufferPair(row.originalEstimate, buffer);
+    const sgWith = op.withBuffer - row.remainingEstimate - row.timeSpent;
+    const sgWithout = op.withoutBuffer - row.remainingEstimate - row.timeSpent;
+    acc.origWith += op.withBuffer;
+    acc.origWithout += op.withoutBuffer;
+    acc.amount += op.amount;
+    acc.all.withBuffer += sgWith;
+    acc.all.withoutBuffer += sgWithout;
+    if (row.originalEstimate !== 0) {
+      acc.withoutUnestimated.withBuffer += sgWith;
+      acc.withoutUnestimated.withoutBuffer += sgWithout;
+    }
+    if (row.remainingEstimate === 0) {
+      acc.completedOnly.withBuffer += sgWith;
+      acc.completedOnly.withoutBuffer += sgWithout;
+    }
+  }
+
+  const round2 = (n) => Number(n.toFixed(2));
+  const slipGroup = (group, denomWith, denomWithout) => ({
+    withBuffer: round2(group.withBuffer),
+    withoutBuffer: round2(group.withoutBuffer),
+    withBufferPct: safeRatio(group.withBuffer, denomWith),
+    withoutBufferPct: safeRatio(group.withoutBuffer, denomWithout),
+  });
+
+  return {
+    active: true,
+    mode: buffer.mode,
+    percent: buffer.percent,
+    amountHours: round2(acc.amount),
+    original: { withBuffer: round2(acc.origWith), withoutBuffer: round2(acc.origWithout) },
+    timeSpentMetric: {
+      withBuffer: safeRatio(baseSummary.totalTimeSpent, acc.origWith),
+      withoutBuffer: safeRatio(baseSummary.totalTimeSpent, acc.origWithout),
+    },
+    projection:
+      projectionNumerator === null
+        ? null
+        : {
+            withBuffer: safeRatio(projectionNumerator, acc.origWith),
+            withoutBuffer: safeRatio(projectionNumerator, acc.origWithout),
+          },
+    slipGain: {
+      // All three percentages divide by the total original estimate of the
+      // variant (with/without buffer), matching how summarize() computes the
+      // non-buffer percentages against the single total original estimate.
+      allIncluded: slipGroup(acc.all, acc.origWith, acc.origWithout),
+      withoutUnestimated: slipGroup(acc.withoutUnestimated, acc.origWith, acc.origWithout),
+      completedOnly: slipGroup(acc.completedOnly, acc.origWith, acc.origWithout),
+    },
   };
 }
 
@@ -796,11 +923,22 @@ function formatTrendTooltipValue(value) {
 }
 
 function buildTrendChartMarkup(view = activeTrendView) {
-  const series = getVisibleTrendSeries(view);
+  const rawSeries = getVisibleTrendSeries(view);
 
-  if (!series.length) {
+  if (!rawSeries.length) {
     return "";
   }
+
+  const buffer = getBufferSettings();
+  const series = buffer.active
+    ? rawSeries.map((point) => ({
+        ...point,
+        originalBuffer:
+          buffer.mode === "add"
+            ? Number(point.cumulativeOriginalEstimate) * (1 + buffer.p)
+            : Number(point.cumulativeOriginalEstimate) / (1 + buffer.p),
+      }))
+    : rawSeries;
 
   const width = 1040;
   const height = 420;
@@ -813,6 +951,7 @@ function buildTrendChartMarkup(view = activeTrendView) {
       point.cumulativeTimeSpent,
       point.remainingEstimate,
       point.totalWork,
+      ...(buffer.active ? [point.originalBuffer] : []),
     ]),
     0
   );
@@ -871,6 +1010,19 @@ function buildTrendChartMarkup(view = activeTrendView) {
       marker: "triangle",
     },
   ];
+
+  if (buffer.active) {
+    lineDefs.push({
+      key: "originalBuffer",
+      label:
+        buffer.mode === "add"
+          ? "Original Estimate (with buffer)"
+          : "Original Estimate (without buffer)",
+      color: "#b8860b",
+      dash: "4 4",
+      marker: "circle",
+    });
+  }
 
   const gridLines = Array.from({ length: yTicks + 1 }, (_, index) => {
     const value = (yMax / yTicks) * index;
@@ -980,37 +1132,135 @@ function renderTrendChart() {
   });
 }
 
+function renderBufferTileLines(lines) {
+  return `
+    <div class="buffer-pair buffer-pair-tile">
+      ${lines
+        .map(
+          (line) =>
+            `<span class="buffer-pair-line"><em>${line.label}</em> <span class="${line.tone || ""}">${line.value}</span></span>`
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function renderSummary(summary) {
   latestRenderedSummary = summary;
-  const estimateItems = [
-    ["Original Estimate", summary.totalOriginalEstimate],
-    ["Remaining Estimate", summary.totalRemainingEstimate],
-    ["Total Time Spent", summary.totalTimeSpent],
-  ];
+  const buffer = summary.buffer;
+  const bufferOn = Boolean(buffer && buffer.active);
+  const modeLabel = buffer?.mode === "add" ? "added on top" : "included";
 
-  const performanceItems = [
-    ["Time Spent", formatPercent(summary.timeSpentMetric), summary.timeSpentMetric],
-    [
-      "Time Passed",
-      summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric),
-      summary.timePassedMetric,
-    ],
-    ["Overall Progress", formatPercent(summary.overallProgress), summary.overallProgress],
-    [
-      "Projection Till Deadline",
-      summary.projectedTimeSpentTillDeadline === null
-        ? "Waiting for dates"
-        : formatPercent(summary.projectedTimeSpentTillDeadline),
-      summary.projectedTimeSpentTillDeadline,
-    ],
-    ["Time Spent Last Week", formatHours(summary.timeSpentLastWeek), null],
-  ];
-
+  const slipGainKeys = {
+    "All Included": "allIncluded",
+    "Without Unestimated": "withoutUnestimated",
+    "Completed Only": "completedOnly",
+  };
   const slipGainItems = [
     ["All Included", summary.slipGainAllIncluded, summary.slipGainAllIncludedPct],
     ["Without Unestimated", summary.slipGainWithoutUnestimated, summary.slipGainWithoutUnestimatedPct],
     ["Completed Only", summary.slipGainCompletedOnly, summary.slipGainCompletedOnlyPct],
   ];
+
+  const slipGainMarkup = slipGainItems
+    .map(([label, value, pct]) => {
+      if (bufferOn) {
+        const g = buffer.slipGain[slipGainKeys[label]];
+        return `
+              <div class="slip-gain-item">
+                <span>${label}</span>
+                ${renderBufferTileLines([
+                  {
+                    label: "with buffer",
+                    value: `${formatPercent(g.withBufferPct)} (${formatHours(g.withBuffer)}h)`,
+                    tone: g.withBuffer < 0 ? "negative" : "positive",
+                  },
+                  {
+                    label: "without",
+                    value: `${formatPercent(g.withoutBufferPct)} (${formatHours(g.withoutBuffer)}h)`,
+                    tone: g.withoutBuffer < 0 ? "negative" : "positive",
+                  },
+                ])}
+              </div>
+            `;
+      }
+      const tone = Number(value) < 0 ? "negative" : "positive";
+      return `
+              <div class="slip-gain-item ${tone}">
+                <span>${label}</span>
+                <strong>${formatPercent(pct)}</strong>
+                <small>${formatHours(value)}h</small>
+              </div>
+            `;
+    })
+    .join("");
+
+  const originalTileMarkup = bufferOn
+    ? `
+        <div class="metric-item neutral">
+          <span>Original Estimate</span>
+          ${renderBufferTileLines([
+            { label: "with buffer", value: formatHours(buffer.original.withBuffer) },
+            { label: "without", value: formatHours(buffer.original.withoutBuffer) },
+          ])}
+        </div>
+      `
+    : `
+        <div class="metric-item neutral">
+          <span>Original Estimate</span>
+          <strong>${formatHours(summary.totalOriginalEstimate)}</strong>
+        </div>
+      `;
+
+  const bufferAmountTile = bufferOn
+    ? `
+        <div class="metric-item neutral">
+          <span>Buffer (${formatPercent(buffer.percent / 100)}, ${modeLabel})</span>
+          <strong>${formatHours(buffer.amountHours)}</strong>
+        </div>
+      `
+    : "";
+
+  const timeSpentTile = bufferOn
+    ? `
+        <div class="metric-item neutral">
+          <span>Time Spent</span>
+          ${renderBufferTileLines([
+            { label: "with buffer", value: formatPercent(buffer.timeSpentMetric.withBuffer) },
+            { label: "without", value: formatPercent(buffer.timeSpentMetric.withoutBuffer) },
+          ])}
+        </div>
+      `
+    : `
+        <div class="metric-item neutral">
+          <span>Time Spent</span>
+          <strong>${formatPercent(summary.timeSpentMetric)}</strong>
+          ${renderMetricProgressBar(summary.timeSpentMetric)}
+        </div>
+      `;
+
+  const projectionTile =
+    bufferOn && buffer.projection
+      ? `
+        <div class="metric-item neutral">
+          <span>Projection Till Deadline</span>
+          ${renderBufferTileLines([
+            { label: "with buffer", value: formatPercent(buffer.projection.withBuffer) },
+            { label: "without", value: formatPercent(buffer.projection.withoutBuffer) },
+          ])}
+        </div>
+      `
+      : `
+        <div class="metric-item neutral">
+          <span>Projection Till Deadline</span>
+          <strong>${
+            summary.projectedTimeSpentTillDeadline === null
+              ? "Waiting for dates"
+              : formatPercent(summary.projectedTimeSpentTillDeadline)
+          }</strong>
+          ${renderMetricProgressBar(summary.projectedTimeSpentTillDeadline)}
+        </div>
+      `;
 
   summarySection.innerHTML = `
     <article class="summary-card slip-gain-group">
@@ -1019,18 +1269,7 @@ function renderSummary(summary) {
         <strong>Portfolio View</strong>
       </div>
       <div class="slip-gain-grid">
-        ${slipGainItems
-          .map(([label, value, pct]) => {
-            const tone = Number(value) < 0 ? "negative" : "positive";
-            return `
-              <div class="slip-gain-item ${tone}">
-                <span>${label}</span>
-                <strong>${formatPercent(pct)}</strong>
-                <small>${formatHours(value)}h</small>
-              </div>
-            `;
-          })
-          .join("")}
+        ${slipGainMarkup}
       </div>
     </article>
 
@@ -1040,16 +1279,16 @@ function renderSummary(summary) {
         <strong>Estimate Snapshot</strong>
       </div>
       <div class="slip-gain-grid">
-        ${estimateItems
-          .map(
-            ([label, value]) => `
-              <div class="metric-item neutral">
-                <span>${label}</span>
-                <strong>${formatHours(value)}</strong>
-              </div>
-            `
-          )
-          .join("")}
+        ${originalTileMarkup}
+        <div class="metric-item neutral">
+          <span>Remaining Estimate</span>
+          <strong>${formatHours(summary.totalRemainingEstimate)}</strong>
+        </div>
+        <div class="metric-item neutral">
+          <span>Total Time Spent</span>
+          <strong>${formatHours(summary.totalTimeSpent)}</strong>
+        </div>
+        ${bufferAmountTile}
       </div>
     </article>
 
@@ -1059,17 +1298,24 @@ function renderSummary(summary) {
         <strong>Workbook Metrics</strong>
       </div>
       <div class="slip-gain-grid">
-        ${performanceItems
-          .map(
-            ([label, value, progressValue]) => `
-              <div class="metric-item neutral">
-                <span>${label}</span>
-                <strong>${value}</strong>
-                ${renderMetricProgressBar(progressValue)}
-              </div>
-            `
-          )
-          .join("")}
+        ${timeSpentTile}
+        <div class="metric-item neutral">
+          <span>Time Passed</span>
+          <strong>${
+            summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric)
+          }</strong>
+          ${renderMetricProgressBar(summary.timePassedMetric)}
+        </div>
+        <div class="metric-item neutral">
+          <span>Overall Progress</span>
+          <strong>${formatPercent(summary.overallProgress)}</strong>
+          ${renderMetricProgressBar(summary.overallProgress)}
+        </div>
+        ${projectionTile}
+        <div class="metric-item neutral">
+          <span>Time Spent Last Week</span>
+          <strong>${formatHours(summary.timeSpentLastWeek)}</strong>
+        </div>
       </div>
     </article>
   `;
@@ -1152,10 +1398,23 @@ function updateSortHeaders() {
   });
 }
 
+function renderBufferHoursCell(pair, { tone = false } = {}) {
+  const cls = (value) => (tone ? (value < 0 ? "negative" : "positive") : "");
+  return `
+    <div class="buffer-pair">
+      <span class="buffer-pair-line"><em>with buffer</em> <span class="${cls(pair.withBuffer)}">${formatHours(pair.withBuffer)}</span></span>
+      <span class="buffer-pair-line"><em>without</em> <span class="${cls(pair.withoutBuffer)}">${formatHours(pair.withoutBuffer)}</span></span>
+    </div>
+  `;
+}
+
 function renderRows(rows) {
+  const buffer = getBufferSettings();
+
   reportBody.innerHTML = sortedRows(rows)
-    .map(
-      (row) => `
+    .map((row) => {
+      if (!buffer.active) {
+        return `
         <tr>
           <td>${row.issueKey}</td>
           <td>${row.summary}</td>
@@ -1166,8 +1425,27 @@ function renderRows(rows) {
           <td>${formatPercent(row.progress)}</td>
           <td>${renderProgressBar(row.progress)}</td>
         </tr>
-      `
-    )
+      `;
+      }
+
+      const origPair = bufferPair(row.originalEstimate, buffer);
+      const slipPair = {
+        withBuffer: origPair.withBuffer - row.remainingEstimate - row.timeSpent,
+        withoutBuffer: origPair.withoutBuffer - row.remainingEstimate - row.timeSpent,
+      };
+      return `
+        <tr>
+          <td>${row.issueKey}</td>
+          <td>${row.summary}</td>
+          <td>${renderBufferHoursCell(origPair)}</td>
+          <td>${formatHours(row.remainingEstimate)}</td>
+          <td>${formatHours(row.timeSpent)}</td>
+          <td>${renderBufferHoursCell(slipPair, { tone: true })}</td>
+          <td>${formatPercent(row.progress)}</td>
+          <td>${renderProgressBar(row.progress)}</td>
+        </tr>
+      `;
+    })
     .join("");
 
   reportSection.classList.remove("hidden");
@@ -1747,31 +2025,80 @@ function downloadPdf() {
   }
 
   const summary = latestRenderedSummary;
+  const buffer = summary.buffer;
+  const bufferOn = Boolean(buffer && buffer.active);
+  const modeWord = buffer?.mode === "add" ? "added" : "included";
+  const pdfDual = (withHtml, withoutHtml) =>
+    `<span class="buffer-dual"><span><em>with buffer</em> ${withHtml}</span><span><em>without</em> ${withoutHtml}</span></span>`;
+  const toneHours = (value) =>
+    `<span class="${value < 0 ? "negative" : "positive"}">${formatHours(value)}</span>`;
+
   const trendMarkup = buildTrendChartMarkup(activeTrendView);
   const trendViewLabel = activeTrendView === "monthly" ? "Monthly view" : "Weekly view";
+
+  const slipGainDisplay = (baseValue, basePct, key) => {
+    if (!bufferOn) {
+      return `${formatPercent(basePct)} (${formatHours(baseValue)}h)`;
+    }
+    const g = buffer.slipGain[key];
+    return pdfDual(
+      `${formatPercent(g.withBufferPct)} (${formatHours(g.withBuffer)}h)`,
+      `${formatPercent(g.withoutBufferPct)} (${formatHours(g.withoutBuffer)}h)`
+    );
+  };
+
+  const originalDisplay = bufferOn
+    ? pdfDual(formatHours(buffer.original.withBuffer), formatHours(buffer.original.withoutBuffer))
+    : formatHours(summary.totalOriginalEstimate);
+
   const slipGainItems = [
-    ["Slip/gain all included", formatHours(summary.slipGainAllIncluded), formatPercent(summary.slipGainAllIncludedPct)],
-    ["Slip/gain without unestimated work", formatHours(summary.slipGainWithoutUnestimated), formatPercent(summary.slipGainWithoutUnestimatedPct)],
-    ["Slip/gain only completed work", formatHours(summary.slipGainCompletedOnly), formatPercent(summary.slipGainCompletedOnlyPct)],
+    ["Slip/gain all included", slipGainDisplay(summary.slipGainAllIncluded, summary.slipGainAllIncludedPct, "allIncluded")],
+    ["Slip/gain without unestimated work", slipGainDisplay(summary.slipGainWithoutUnestimated, summary.slipGainWithoutUnestimatedPct, "withoutUnestimated")],
+    ["Slip/gain only completed work", slipGainDisplay(summary.slipGainCompletedOnly, summary.slipGainCompletedOnlyPct, "completedOnly")],
   ];
 
   const estimateItems = [
-    ["Original estimate", formatHours(summary.totalOriginalEstimate)],
+    ["Original estimate", originalDisplay],
     ["Remaining estimate", formatHours(summary.totalRemainingEstimate)],
     ["Total time spent", formatHours(summary.totalTimeSpent)],
   ];
+  if (bufferOn) {
+    estimateItems.push([
+      `Buffer (${formatPercent(buffer.percent / 100)}, ${modeWord})`,
+      formatHours(buffer.amountHours),
+    ]);
+  }
 
   const metricRows = [
-    ["Time spent", formatPercent(summary.timeSpentMetric)],
+    [
+      "Time spent",
+      bufferOn
+        ? pdfDual(
+            formatPercent(buffer.timeSpentMetric.withBuffer),
+            formatPercent(buffer.timeSpentMetric.withoutBuffer)
+          )
+        : formatPercent(summary.timeSpentMetric),
+    ],
     ["Time passed", summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric)],
     ["Overall progress", formatPercent(summary.overallProgress)],
     ["Last week time spent", formatHours(summary.timeSpentLastWeek)],
-    ["Projection of time spent till deadline", summary.projectedTimeSpentTillDeadline === null ? "Waiting for dates" : formatPercent(summary.projectedTimeSpentTillDeadline)],
+    [
+      "Projection of time spent till deadline",
+      bufferOn && buffer.projection
+        ? pdfDual(
+            formatPercent(buffer.projection.withBuffer),
+            formatPercent(buffer.projection.withoutBuffer)
+          )
+        : summary.projectedTimeSpentTillDeadline === null
+          ? "Waiting for dates"
+          : formatPercent(summary.projectedTimeSpentTillDeadline),
+    ],
   ];
 
   const tableRows = sortedRows(latestRows)
-    .map(
-      (row) => `
+    .map((row) => {
+      if (!bufferOn) {
+        return `
         <tr>
           <td>${escapeHtml(row.issueKey)}</td>
           <td>${escapeHtml(row.summary)}</td>
@@ -1781,8 +2108,25 @@ function downloadPdf() {
           <td class="${row.slipGain < 0 ? "negative" : "positive"}">${formatHours(row.slipGain)}</td>
           <td>${formatPercent(row.progress)}</td>
         </tr>
-      `
-    )
+      `;
+      }
+      const op = bufferPair(row.originalEstimate, buffer);
+      const sp = {
+        withBuffer: op.withBuffer - row.remainingEstimate - row.timeSpent,
+        withoutBuffer: op.withoutBuffer - row.remainingEstimate - row.timeSpent,
+      };
+      return `
+        <tr>
+          <td>${escapeHtml(row.issueKey)}</td>
+          <td>${escapeHtml(row.summary)}</td>
+          <td>${pdfDual(formatHours(op.withBuffer), formatHours(op.withoutBuffer))}</td>
+          <td>${formatHours(row.remainingEstimate)}</td>
+          <td>${formatHours(row.timeSpent)}</td>
+          <td>${pdfDual(toneHours(sp.withBuffer), toneHours(sp.withoutBuffer))}</td>
+          <td>${formatPercent(row.progress)}</td>
+        </tr>
+      `;
+    })
     .join("");
 
   const printHtml = `
@@ -1807,6 +2151,9 @@ function downloadPdf() {
           .metric-item span, .meta-item span { line-height: 1.35; }
           .metric-item strong, .meta-item strong { font-size: 14px; text-align: right; justify-self: end; white-space: nowrap; }
           .slip-value { text-align: right; justify-self: end; white-space: nowrap; }
+          .buffer-dual { display: grid; gap: 2px; text-align: right; }
+          .buffer-dual span { white-space: nowrap; }
+          .buffer-dual em { color: #5a6472; font-style: normal; font-size: 11px; margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
           .trend-shell { display: grid; gap: 14px; }
           .trend-copy { margin-top: 4px; color: #5a6472; font-size: 13px; }
           .trend-legend { display: flex; flex-wrap: wrap; gap: 12px 16px; margin-bottom: 10px; }
@@ -1836,6 +2183,7 @@ function downloadPdf() {
             <div class="meta-grid">
               <div class="meta-item"><span class="label">Report date</span><strong>${escapeHtml(formatDate(summary.reportCreationDate))}</strong></div>
               ${summary.snapshotDate ? `<div class="meta-item"><span class="label">Snapshot date</span><strong>${escapeHtml(formatDate(summary.snapshotDate))}</strong></div>` : ""}
+              ${bufferOn ? `<div class="meta-item"><span class="label">Buffer</span><strong>${escapeHtml(formatPercent(buffer.percent / 100))} ${escapeHtml(modeWord)}</strong></div>` : ""}
               <div class="meta-item"><span class="label">Project start date</span><strong>${escapeHtml(formatDate(summary.projectStartDate))}</strong></div>
               <div class="meta-item"><span class="label">Deadline</span><strong>${escapeHtml(formatDate(summary.deadline))}</strong></div>
             </div>
@@ -1844,13 +2192,13 @@ function downloadPdf() {
             <div class="card">
               <h2>Overview</h2>
               <div class="metric-grid">
-                <div class="metric-item"><span>Original estimate</span><strong>${formatHours(summary.totalOriginalEstimate)}</strong></div>
+                <div class="metric-item"><span>Original estimate</span><strong class="slip-value">${originalDisplay}</strong></div>
                 ${slipGainItems
                   .map(
-                    ([label, amount, pct]) => `
+                    ([label, value]) => `
                       <div class="metric-item">
                         <span>${escapeHtml(label)}</span>
-                        <strong class="slip-value">${escapeHtml(pct)} (${escapeHtml(amount)}h)</strong>
+                        <strong class="slip-value">${value}</strong>
                       </div>
                     `
                   )
@@ -1865,7 +2213,7 @@ function downloadPdf() {
                     ([label, value]) => `
                       <div class="metric-item">
                         <span>${escapeHtml(label)}</span>
-                        <strong>${escapeHtml(value)}</strong>
+                        <strong class="slip-value">${value}</strong>
                       </div>
                     `
                   )
@@ -1880,7 +2228,7 @@ function downloadPdf() {
                     ([label, value]) => `
                       <div class="metric-item">
                         <span>${escapeHtml(label)}</span>
-                        <strong>${escapeHtml(value)}</strong>
+                        <strong class="slip-value">${value}</strong>
                       </div>
                     `
                   )
@@ -2355,9 +2703,41 @@ trendToggleButtons.forEach((button) => {
     }
   });
 });
+function syncBufferModeButton() {
+  if (!bufferModeToggle) {
+    return;
+  }
+  const included = bufferMode !== "add";
+  bufferModeToggle.textContent = included ? "Buffer included" : "Buffer not included";
+  bufferModeToggle.dataset.mode = included ? "included" : "add";
+  bufferModeToggle.setAttribute("aria-pressed", included ? "true" : "false");
+}
+
+function refreshBufferViews() {
+  if (!latestBaseSummary) {
+    return;
+  }
+  renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
+  if (latestRows.length) {
+    renderRows(latestRows);
+  }
+  if (latestTrendData) {
+    renderTrendChart();
+  }
+}
+
+bufferModeToggle?.addEventListener("click", () => {
+  bufferMode = bufferMode === "add" ? "included" : "add";
+  syncBufferModeButton();
+  refreshBufferViews();
+});
+
 reportMetadataForm.addEventListener("input", () => {
   renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
   syncTrendDateDefaults();
+  if (latestRows.length) {
+    renderRows(latestRows);
+  }
   if (latestTrendData) {
     renderTrendChart();
   }

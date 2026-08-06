@@ -300,6 +300,17 @@
             Time Spent Last Week
             <input id="timeSpentLastWeek" name="timeSpentLastWeek" type="number" min="0" step="0.01" placeholder="0" />
           </label>
+
+          <label>
+            Buffer %
+            <input id="bufferPercent" name="bufferPercent" type="number" min="0" step="0.1" placeholder="0" />
+          </label>
+
+          <div class="buffer-mode-field">
+            <span class="buffer-mode-caption">Buffer status</span>
+            <button type="button" id="buffer-mode-toggle" class="secondary-button buffer-mode-toggle" data-mode="included" aria-pressed="true">Buffer included</button>
+            <span class="buffer-mode-hint">Included: current estimates already contain the buffer. Not included: buffer is added on top.</span>
+          </div>
         </form>
       </section>
 

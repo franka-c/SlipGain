@@ -1181,6 +1181,57 @@ button:not(.secondary-button):not(.mini-action):not(.auth-link-button) *,
   font-weight: 600;
 }
 
+.buffer-mode-field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.buffer-mode-caption {
+  font-size: 13px;
+  color: var(--muted, #5a6472);
+}
+
+.buffer-mode-toggle {
+  justify-self: start;
+}
+
+.buffer-mode-toggle[data-mode="add"] {
+  border-color: var(--accent, #0b6cf0);
+  color: var(--accent, #0b6cf0);
+}
+
+.buffer-mode-hint {
+  font-size: 12px;
+  color: var(--muted, #5a6472);
+  line-height: 1.35;
+}
+
+.buffer-pair {
+  display: grid;
+  gap: 2px;
+}
+
+.buffer-pair-line {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.buffer-pair-line em {
+  font-style: normal;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #5a6472);
+}
+
+.buffer-pair-tile {
+  justify-items: end;
+  text-align: right;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
