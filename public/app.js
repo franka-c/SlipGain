@@ -81,7 +81,8 @@ const snapshotDateInput = document.getElementById("snapshotDate");
 const clearSnapshotButton = document.getElementById("clear-snapshot");
 const snapshotLabel = document.getElementById("snapshot-label");
 const bufferPercentInput = document.getElementById("bufferPercent");
-const bufferModeToggle = document.getElementById("buffer-mode-toggle");
+const bufferSegButtons = document.querySelectorAll(".buffer-seg");
+const bufferModeSegmented = document.querySelector(".buffer-mode-segmented");
 const loadProjectsButton = document.getElementById("load-projects");
 
 let latestRows = [];
@@ -459,7 +460,7 @@ function resetReportMetadata(projectName = "") {
     bufferPercentInput.value = "";
   }
   bufferMode = "included";
-  syncBufferModeButton();
+  syncBufferModeControl();
 }
 
 function resetConfigInputs() {
@@ -2579,6 +2580,7 @@ async function generateReport({ refresh = false } = {}) {
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
     renderRows(data.rows);
     updateSnapshotIndicator(data.snapshotDate || "");
+    syncBufferModeControl();
     partialFilterSection.classList.add("hidden");
     exportActions.classList.toggle("hidden", data.rows.length === 0);
     downloadPdfButton.disabled = data.rows.length === 0;
@@ -2706,14 +2708,17 @@ trendToggleButtons.forEach((button) => {
     }
   });
 });
-function syncBufferModeButton() {
-  if (!bufferModeToggle) {
-    return;
+function syncBufferModeControl() {
+  const active = getBufferSettings().active;
+  bufferSegButtons.forEach((button) => {
+    const isSelected = (button.dataset.mode === "add" ? "add" : "included") === bufferMode;
+    button.classList.toggle("active", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  });
+  if (bufferModeSegmented) {
+    // Buffer mode has no effect until a percentage is entered, so dim it.
+    bufferModeSegmented.classList.toggle("is-muted", !active);
   }
-  const included = bufferMode !== "add";
-  bufferModeToggle.textContent = included ? "Buffer included" : "Buffer not included";
-  bufferModeToggle.dataset.mode = included ? "included" : "add";
-  bufferModeToggle.setAttribute("aria-pressed", included ? "true" : "false");
 }
 
 function refreshBufferViews() {
@@ -2729,15 +2734,18 @@ function refreshBufferViews() {
   }
 }
 
-bufferModeToggle?.addEventListener("click", () => {
-  bufferMode = bufferMode === "add" ? "included" : "add";
-  syncBufferModeButton();
-  refreshBufferViews();
+bufferSegButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    bufferMode = button.dataset.mode === "add" ? "add" : "included";
+    syncBufferModeControl();
+    refreshBufferViews();
+  });
 });
 
 reportMetadataForm.addEventListener("input", () => {
   renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
   syncTrendDateDefaults();
+  syncBufferModeControl();
   if (latestRows.length) {
     renderRows(latestRows);
   }

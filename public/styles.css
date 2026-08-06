@@ -1181,27 +1181,48 @@ button:not(.secondary-button):not(.mini-action):not(.auth-link-button) *,
   font-weight: 600;
 }
 
-.buffer-mode-field {
+.buffer-field {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   align-content: start;
 }
 
-.buffer-mode-caption {
-  font-size: 13px;
+.buffer-field-caption {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.buffer-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.buffer-percent-wrap {
+  position: relative;
+  flex: 0 0 116px;
+}
+
+.buffer-percent-wrap input {
+  padding-right: 30px;
+}
+
+.buffer-percent-suffix {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--muted, #5a6472);
+  pointer-events: none;
 }
 
-.buffer-mode-toggle {
-  justify-self: start;
+.buffer-mode-segmented.is-muted {
+  opacity: 0.5;
 }
 
-.buffer-mode-toggle[data-mode="add"] {
-  border-color: var(--accent, #0b6cf0);
-  color: var(--accent, #0b6cf0);
-}
-
-.buffer-mode-hint {
+.buffer-field-hint {
   font-size: 12px;
   color: var(--muted, #5a6472);
   line-height: 1.35;
@@ -1230,6 +1251,18 @@ button:not(.secondary-button):not(.mini-action):not(.auth-link-button) *,
 .buffer-pair-tile {
   justify-items: end;
   text-align: right;
+}
+
+/* Restore red/green on buffered slip/gain values; the tone class alone is
+   outweighed by `.slip-gain-item span` / `.metric-item span` (muted). */
+.buffer-pair-line .positive {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.buffer-pair-line .negative {
+  color: var(--danger);
+  font-weight: 700;
 }
 
 .table-wrap {
