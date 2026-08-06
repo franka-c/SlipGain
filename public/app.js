@@ -75,7 +75,6 @@ const errorDetails = document.getElementById("error-details");
 const debugOutput = document.getElementById("debug-output");
 const dismissErrorButton = document.getElementById("dismiss-error");
 const exportActions = document.getElementById("export-actions");
-const exportButton = document.getElementById("export-csv");
 const downloadPdfButton = document.getElementById("download-pdf");
 const refreshFromJiraButton = document.getElementById("refresh-from-jira");
 const snapshotDateInput = document.getElementById("snapshotDate");
@@ -1742,93 +1741,6 @@ async function loadProjects() {
   }
 }
 
-function exportCsv() {
-  if (!latestRenderedSummary) {
-    setStatus("Generate a report before exporting CSV.", true);
-    return;
-  }
-
-  const summary = latestRenderedSummary;
-  const summaryRows = [
-    ["Project Title", summary.projectTitle],
-    ["Report Creation Date", formatDate(summary.reportCreationDate)],
-    ["Project Start Date", formatDate(summary.projectStartDate)],
-    ["Deadline", formatDate(summary.deadline)],
-    ["Total Original Estimate", formatHours(summary.totalOriginalEstimate)],
-    ["Total Remaining Estimate", formatHours(summary.totalRemainingEstimate)],
-    ["Total Time Spent", formatHours(summary.totalTimeSpent)],
-    ["Slip/Gain All Included", formatHours(summary.slipGainAllIncluded)],
-    ["Slip/Gain All Included %", formatPercent(summary.slipGainAllIncludedPct)],
-    ["Slip/Gain Without Unestimated", formatHours(summary.slipGainWithoutUnestimated)],
-    ["Slip/Gain Without Unestimated %", formatPercent(summary.slipGainWithoutUnestimatedPct)],
-    ["Slip/Gain Completed Only", formatHours(summary.slipGainCompletedOnly)],
-    ["Slip/Gain Completed Only %", formatPercent(summary.slipGainCompletedOnlyPct)],
-    ["Time Spent Metric", formatPercent(summary.timeSpentMetric)],
-    [
-      "Time Passed",
-      summary.timePassedMetric === null ? "Waiting for dates" : formatPercent(summary.timePassedMetric),
-    ],
-    ["Overall Progress", formatPercent(summary.overallProgress)],
-    ["Time Spent Last Week", formatHours(summary.timeSpentLastWeek)],
-    [
-      "Projection Till Deadline",
-      summary.projectedTimeSpentTillDeadline === null
-        ? "Waiting for dates"
-        : formatPercent(summary.projectedTimeSpentTillDeadline),
-    ],
-  ];
-
-  const headers = [
-    "Issue Key",
-    "Summary",
-    "Original estimate",
-    "Remaining Estimate",
-    "Time Spent",
-    "Slip/Gain",
-    "Progress",
-  ];
-
-  const lines = latestRows.map((row) =>
-    [
-      row.issueKey,
-      row.summary,
-      row.originalEstimate,
-      row.remainingEstimate,
-      row.timeSpent,
-      row.slipGain,
-      row.progress,
-    ]
-      .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-      .join(",")
-  );
-
-  const summaryCsv = [
-    ["Metric", "Value"].join(","),
-    ...summaryRows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")),
-    "",
-    headers.join(","),
-  ];
-
-  const csv = [...summaryCsv, ...lines].join("\n");
-  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const downloadFrame = window.open(url, "_blank");
-
-  if (!downloadFrame) {
-    setStatus("The CSV export window was blocked by the browser. Allow pop-ups and try again.", true);
-    return;
-  }
-
-  setStatus("CSV opened in a new tab. Save it from there if it does not download automatically.");
-  captureEvent("csv_exported", {
-    row_count: latestRows.length,
-    project_title: latestRenderedSummary.projectTitle || "",
-  });
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 60000);
-}
-
 function downloadPdf() {
   if (!latestRenderedSummary || latestRows.length === 0) {
     return;
@@ -2291,7 +2203,6 @@ async function generateReport({ refresh = false } = {}) {
     false,
     true
   );
-  exportButton.disabled = true;
 
   try {
     const data = await postJson("/api/report", payload);
@@ -2319,7 +2230,6 @@ async function generateReport({ refresh = false } = {}) {
     updateSnapshotIndicator(data.snapshotDate || "");
     partialFilterSection.classList.add("hidden");
     exportActions.classList.toggle("hidden", data.rows.length === 0);
-    exportButton.disabled = data.rows.length === 0;
     downloadPdfButton.disabled = data.rows.length === 0;
     setStatus(`Report ready. ${data.rows.length} epics included.`);
     const reportFilters = getReportFilters();
@@ -2351,7 +2261,6 @@ async function generateReport({ refresh = false } = {}) {
     return true;
   } catch (error) {
     exportActions.classList.add("hidden");
-    exportButton.disabled = true;
     downloadPdfButton.disabled = true;
     renderError(error.payload, error.message);
     setStatus(error.message, true);
@@ -2437,7 +2346,6 @@ adminButton.addEventListener("click", async () => {
 });
 reportButton.addEventListener("click", showReportRoute);
 backToReportButton.addEventListener("click", showReportRoute);
-exportButton.addEventListener("click", exportCsv);
 downloadPdfButton.addEventListener("click", downloadPdf);
 trendToggleButtons.forEach((button) => {
   button.addEventListener("click", () => {
