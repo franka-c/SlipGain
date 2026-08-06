@@ -4,6 +4,7 @@
   "private": true,
   "description": "Local Jira slip/gain reporting app",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:local": "node --env-file=.env server.js"
   }
 }
