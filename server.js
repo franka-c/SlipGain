@@ -42,15 +42,24 @@ function sendFile(res, filePath) {
     ".woff2": "font/woff2",
   };
 
+  // HTML/CSS/JS must always be revalidated so a cached asset can never desync
+  // from a freshly deployed index.html. no-cache still allows 304s via ETag.
+  const revalidateExts = new Set([".html", ".css", ".js"]);
+
   fs.readFile(filePath, (error, content) => {
     if (error) {
       sendJson(res, 404, { error: "Not found" });
       return;
     }
 
-    res.writeHead(200, {
+    const headers = {
       "Content-Type": contentTypes[ext] || "application/octet-stream",
-    });
+    };
+    if (revalidateExts.has(ext)) {
+      headers["Cache-Control"] = "no-cache";
+    }
+
+    res.writeHead(200, headers);
     res.end(content);
   });
 }

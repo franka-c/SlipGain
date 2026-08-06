@@ -4,5 +4,11 @@
     { "source": "/admin", "destination": "/public/index.html" },
     { "source": "/app.js", "destination": "/public/app.js" },
     { "source": "/styles.css", "destination": "/public/styles.css" }
+  ],
+  "headers": [
+    { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/admin", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/app.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/styles.css", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
   ]
 }
