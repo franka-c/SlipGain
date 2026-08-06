@@ -1249,8 +1249,8 @@ button:not(.secondary-button):not(.mini-action):not(.auth-link-button) *,
 }
 
 .buffer-pair-tile {
-  justify-items: end;
-  text-align: right;
+  justify-items: start;
+  text-align: left;
 }
 
 /* Restore red/green on buffered slip/gain values; the tone class alone is
