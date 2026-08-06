@@ -821,6 +821,9 @@ function buildBufferView(baseSummary, metadata, { projectionNumerator }) {
     active: true,
     mode: buffer.mode,
     percent: buffer.percent,
+    // p is included so the returned view is a valid buffer-settings object for
+    // bufferPair() (the PDF re-derives per-row pairs from summary.buffer).
+    p: buffer.p,
     amountHours: round2(acc.amount),
     original: { withBuffer: round2(acc.origWith), withoutBuffer: round2(acc.origWithout) },
     timeSpentMetric: {
