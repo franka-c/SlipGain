@@ -300,6 +300,21 @@
             Time Spent Last Week
             <input id="timeSpentLastWeek" name="timeSpentLastWeek" type="number" min="0" step="0.01" placeholder="0" />
           </label>
+
+          <div class="buffer-field">
+            <span class="buffer-field-caption">Buffer</span>
+            <div class="buffer-controls">
+              <div class="buffer-percent-wrap">
+                <input id="bufferPercent" name="bufferPercent" type="number" min="0" step="0.1" placeholder="0" aria-label="Buffer percentage" />
+                <span class="buffer-percent-suffix">%</span>
+              </div>
+              <div class="trend-toggle buffer-mode-segmented" role="group" aria-label="Buffer status">
+                <button type="button" class="trend-toggle-button buffer-seg active" data-mode="included" aria-pressed="true">Included</button>
+                <button type="button" class="trend-toggle-button buffer-seg" data-mode="add" aria-pressed="false">Not included</button>
+              </div>
+            </div>
+            <span class="buffer-field-hint">Included: estimates already contain the buffer. Not included: buffer is added on top.</span>
+          </div>
         </form>
       </section>
 
