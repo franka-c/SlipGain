@@ -78,6 +78,9 @@ const exportActions = document.getElementById("export-actions");
 const exportButton = document.getElementById("export-csv");
 const downloadPdfButton = document.getElementById("download-pdf");
 const refreshFromJiraButton = document.getElementById("refresh-from-jira");
+const snapshotDateInput = document.getElementById("snapshotDate");
+const clearSnapshotButton = document.getElementById("clear-snapshot");
+const snapshotLabel = document.getElementById("snapshot-label");
 const loadProjectsButton = document.getElementById("load-projects");
 
 let latestRows = [];
@@ -360,9 +363,13 @@ function getFormPayload() {
   return Object.fromEntries(data.entries());
 }
 
+function getSnapshotDate() {
+  return snapshotDateInput?.value || "";
+}
+
 function getMetadataPayload() {
   const data = new FormData(reportMetadataForm);
-  return Object.fromEntries(data.entries());
+  return { ...Object.fromEntries(data.entries()), snapshotDate: getSnapshotDate() };
 }
 
 function resetReportMetadata(projectName = "") {
@@ -404,6 +411,11 @@ function resetReportMetadata(projectName = "") {
     trendEndDateInput.value = today;
     delete trendEndDateInput.dataset.userSet;
   }
+
+  if (snapshotDateInput) {
+    snapshotDateInput.value = "";
+  }
+  updateSnapshotIndicator("");
 }
 
 function resetConfigInputs() {
@@ -673,7 +685,11 @@ function buildSummary(baseSummary, metadata) {
   const projectStartDate = parseDateInput(metadata.projectStartDate);
   const deadline = parseDateInput(metadata.deadline);
   const reportCreationDate = parseDateInput(metadata.reportCreationDate);
-  const effectiveToday = reportCreationDate || new Date();
+  const snapshotDate = parseDateInput(metadata.snapshotDate);
+  // In a point-in-time snapshot, the snapshot date is the single "as of"
+  // reference for every time-relative metric (elapsed time and projection).
+  const effectiveToday = snapshotDate || reportCreationDate || new Date();
+  const projectionReference = snapshotDate || reportCreationDate;
   const timeSpentLastWeek = Number(metadata.timeSpentLastWeek || 0);
 
   return {
@@ -682,6 +698,7 @@ function buildSummary(baseSummary, metadata) {
     reportCreationDate: metadata.reportCreationDate || "",
     projectStartDate: metadata.projectStartDate || "",
     deadline: metadata.deadline || "",
+    snapshotDate: metadata.snapshotDate || "",
     timeSpentLastWeek: Number(timeSpentLastWeek.toFixed(2)),
     timeSpentMetric: safeRatio(baseSummary.totalTimeSpent, baseSummary.totalOriginalEstimate),
     timePassedMetric:
@@ -693,9 +710,9 @@ function buildSummary(baseSummary, metadata) {
       baseSummary.totalTimeSpent + baseSummary.totalRemainingEstimate
     ),
     projectedTimeSpentTillDeadline:
-      reportCreationDate && deadline
+      projectionReference && deadline
         ? safeRatio(
-            (signedDaysBetween(reportCreationDate, deadline) / 7) * timeSpentLastWeek + baseSummary.totalTimeSpent,
+            (signedDaysBetween(projectionReference, deadline) / 7) * timeSpentLastWeek + baseSummary.totalTimeSpent,
             baseSummary.totalOriginalEstimate
           )
         : null,
@@ -1906,6 +1923,7 @@ function downloadPdf() {
             </div>
             <div class="meta-grid">
               <div class="meta-item"><span class="label">Report date</span><strong>${escapeHtml(formatDate(summary.reportCreationDate))}</strong></div>
+              ${summary.snapshotDate ? `<div class="meta-item"><span class="label">Snapshot date</span><strong>${escapeHtml(formatDate(summary.snapshotDate))}</strong></div>` : ""}
               <div class="meta-item"><span class="label">Project start date</span><strong>${escapeHtml(formatDate(summary.projectStartDate))}</strong></div>
               <div class="meta-item"><span class="label">Deadline</span><strong>${escapeHtml(formatDate(summary.deadline))}</strong></div>
             </div>
@@ -2255,17 +2273,21 @@ loadProjectsButton.addEventListener("click", loadProjects);
 
 async function generateReport({ refresh = false } = {}) {
   const { email, apiToken, projectKey } = getFormPayload();
+  const snapshotDate = getSnapshotDate();
   const payload = {
     email,
     apiToken,
     projectKey,
     filters: getReportFilters(),
     ...(refresh ? { refresh: true } : {}),
+    ...(snapshotDate ? { snapshotDate } : {}),
   };
   setStatus(
     refresh
       ? "Refreshing report from Jira. This can take a while for large projects..."
-      : "Generating report. This can take a while for large projects...",
+      : snapshotDate
+        ? `Building snapshot as of ${snapshotDate}. This can take a while for large projects...`
+        : "Generating report. This can take a while for large projects...",
     false,
     true
   );
@@ -2294,6 +2316,7 @@ async function generateReport({ refresh = false } = {}) {
     renderTrendEmptyState("Choose a date range and click Load Graph.");
     renderSummary(buildSummary(latestBaseSummary, getMetadataPayload()));
     renderRows(data.rows);
+    updateSnapshotIndicator(data.snapshotDate || "");
     partialFilterSection.classList.add("hidden");
     exportActions.classList.toggle("hidden", data.rows.length === 0);
     exportButton.disabled = data.rows.length === 0;
@@ -2365,6 +2388,37 @@ async function refreshFromJira() {
 }
 
 refreshFromJiraButton.addEventListener("click", refreshFromJira);
+
+function updateSnapshotIndicator(snapshotDate) {
+  const active = Boolean(snapshotDate);
+  if (clearSnapshotButton) {
+    clearSnapshotButton.classList.toggle("hidden", !active);
+  }
+  if (snapshotLabel) {
+    snapshotLabel.textContent = active
+      ? `Snapshot as of ${formatDate(snapshotDate)}`
+      : "Live (current values)";
+    snapshotLabel.classList.toggle("is-snapshot", active);
+  }
+}
+
+snapshotDateInput?.addEventListener("change", () => {
+  if (!getFormPayload().projectKey) {
+    return;
+  }
+  generateReport();
+});
+
+clearSnapshotButton?.addEventListener("click", () => {
+  if (snapshotDateInput) {
+    snapshotDateInput.value = "";
+  }
+  if (!getFormPayload().projectKey) {
+    updateSnapshotIndicator("");
+    return;
+  }
+  generateReport();
+});
 
 adjustFiltersButton.addEventListener("click", showPartialFilters);
 adminButton.addEventListener("click", async () => {
