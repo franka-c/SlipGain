@@ -1153,6 +1153,34 @@ button:not(.secondary-button):not(.mini-action):not(.auth-link-button) *,
   opacity: 0.8;
 }
 
+.snapshot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.snapshot-field {
+  display: grid;
+  gap: 6px;
+}
+
+.snapshot-label {
+  align-self: center;
+  color: var(--muted, #5a6472);
+  font-size: 13px;
+}
+
+.snapshot-label.is-snapshot {
+  color: var(--accent, #0b6cf0);
+  font-weight: 600;
+}
+
 .table-wrap {
   overflow-x: auto;
 }

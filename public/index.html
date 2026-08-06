@@ -423,6 +423,14 @@
       </section>
 
       <section class="card hidden" id="report-section">
+        <div class="snapshot-controls">
+          <div class="snapshot-field">
+            <label for="snapshotDate">Snapshot date</label>
+            <input id="snapshotDate" name="snapshotDate" type="date" />
+          </div>
+          <button type="button" id="clear-snapshot" class="secondary-button hidden">Back to live</button>
+          <span id="snapshot-label" class="snapshot-label"></span>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
