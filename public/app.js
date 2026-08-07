@@ -83,6 +83,9 @@ const snapshotLabel = document.getElementById("snapshot-label");
 const bufferPercentInput = document.getElementById("bufferPercent");
 const bufferSegButtons = document.querySelectorAll(".buffer-seg");
 const bufferModeSegmented = document.querySelector(".buffer-mode-segmented");
+const whatsNewOverlay = document.getElementById("whats-new-overlay");
+const whatsNewCloseButton = document.getElementById("whats-new-close");
+const whatsNewDismissButton = document.getElementById("whats-new-dismiss");
 const loadProjectsButton = document.getElementById("load-projects");
 
 let latestRows = [];
@@ -2342,6 +2345,7 @@ async function updateAuthState(session) {
   applyRouteVisibility();
   updateFilterMenuState();
   resetInactivityTimer();
+  maybeShowWhatsNew();
 }
 
 async function handleLogout(message = "Signed out.") {
@@ -2740,6 +2744,52 @@ bufferSegButtons.forEach((button) => {
     syncBufferModeControl();
     refreshBufferViews();
   });
+});
+
+// Bump this when the What's New content changes; each viewer then sees it once.
+const WHATS_NEW_VERSION = "2026-08-06";
+
+function handleWhatsNewKeydown(event) {
+  if (event.key === "Escape") {
+    closeWhatsNew();
+  }
+}
+
+function closeWhatsNew() {
+  if (whatsNewOverlay) {
+    whatsNewOverlay.classList.add("hidden");
+  }
+  document.removeEventListener("keydown", handleWhatsNewKeydown);
+  try {
+    localStorage.setItem("whatsNewSeen", WHATS_NEW_VERSION);
+  } catch (error) {
+    // localStorage unavailable (private mode); modal simply shows next time.
+  }
+}
+
+function maybeShowWhatsNew() {
+  if (!whatsNewOverlay || !whatsNewOverlay.classList.contains("hidden")) {
+    return;
+  }
+  let seen = null;
+  try {
+    seen = localStorage.getItem("whatsNewSeen");
+  } catch (error) {
+    seen = null;
+  }
+  if (seen === WHATS_NEW_VERSION) {
+    return;
+  }
+  whatsNewOverlay.classList.remove("hidden");
+  document.addEventListener("keydown", handleWhatsNewKeydown);
+}
+
+whatsNewCloseButton?.addEventListener("click", closeWhatsNew);
+whatsNewDismissButton?.addEventListener("click", closeWhatsNew);
+whatsNewOverlay?.addEventListener("click", (event) => {
+  if (event.target === whatsNewOverlay) {
+    closeWhatsNew();
+  }
 });
 
 reportMetadataForm.addEventListener("input", () => {

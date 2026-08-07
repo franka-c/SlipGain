@@ -466,6 +466,27 @@
       </section>
     </main>
 
+    <div id="whats-new-overlay" class="whats-new-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="whats-new-title">
+      <div class="whats-new-modal">
+        <button type="button" id="whats-new-close" class="whats-new-close" aria-label="Close">&times;</button>
+        <p class="eyebrow">What's New</p>
+        <h2 id="whats-new-title">Latest updates</h2>
+        <div class="whats-new-body">
+          <h3>Refresh from Jira</h3>
+          <p>A new button forces a fresh pull from Jira instead of cached data, so estimates edited in Jira show up right away.</p>
+          <h3>Snapshot date filter</h3>
+          <p>Pick a date above the epics list to see how the project looked at that point in time. The estimates, all metrics, and the PDF reflect the chosen date.</p>
+          <h3>Buffer percentage</h3>
+          <p>Add a buffer % with an Included / Not included toggle. Every estimate-based value shows both the with-buffer and without-buffer figure side by side, and the trend graph and PDF include it too.</p>
+          <h3>CSV export removed</h3>
+          <p>The unused Export CSV button is gone. Use Download PDF instead.</p>
+        </div>
+        <div class="whats-new-actions">
+          <button type="button" id="whats-new-dismiss">Got it</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/app.js"></script>
   </body>
   </html>
