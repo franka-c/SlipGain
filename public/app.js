@@ -56,6 +56,7 @@ const reportMetadataSection = document.getElementById("report-metadata-section")
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
+const trendDesignButtons = document.querySelectorAll("[data-trend-design]");
 const trendControlsForm = document.getElementById("trend-controls-form");
 const loadTrendButton = document.getElementById("load-trend-button");
 const adminSection = document.getElementById("admin-section");
@@ -103,6 +104,7 @@ let accessToken = null;
 let latestEpicFilters = null;
 let selectedEpicKeysState = null;
 let activeTrendView = "weekly";
+let trendDesign = "classic";
 let currentUser = null;
 let approvedUsers = [];
 let pendingRequests = [];
@@ -929,6 +931,32 @@ function formatTrendTooltipValue(value) {
   return `${formatHours(value)}h`;
 }
 
+// Shared line definitions so the Classic and New chart designs plot the exact
+// same series, colors, and labels. Only the surrounding look differs.
+function getTrendLineDefs(buffer) {
+  const lineDefs = [
+    { key: "cumulativeOriginalEstimate", label: "Cumulative Original Estimate", color: "#0f7b48", dash: "", marker: "circle" },
+    { key: "cumulativeTimeSpent", label: "Cumulative Time Spent", color: "#1a33ff", dash: "", marker: "square" },
+    { key: "remainingEstimate", label: "Remaining Estimate", color: "#ff3b30", dash: "", marker: "square" },
+    { key: "totalWork", label: "Total Work", color: "#8f1bb3", dash: "8 6", marker: "triangle" },
+  ];
+
+  if (buffer.active) {
+    lineDefs.push({
+      key: "originalBuffer",
+      label:
+        buffer.mode === "add"
+          ? "Original Estimate (with buffer)"
+          : "Original Estimate (without buffer)",
+      color: "#b8860b",
+      dash: "4 4",
+      marker: "circle",
+    });
+  }
+
+  return lineDefs;
+}
+
 function buildTrendChartMarkup(view = activeTrendView) {
   const rawSeries = getVisibleTrendSeries(view);
 
@@ -987,49 +1015,7 @@ function buildTrendChartMarkup(view = activeTrendView) {
   const yPosition = (value) =>
     margin.top + plotHeight - (Number(value) / yMax) * plotHeight;
 
-  const lineDefs = [
-    {
-      key: "cumulativeOriginalEstimate",
-      label: "Cumulative Original Estimate",
-      color: "#0f7b48",
-      dash: "",
-      marker: "circle",
-    },
-    {
-      key: "cumulativeTimeSpent",
-      label: "Cumulative Time Spent",
-      color: "#1a33ff",
-      dash: "",
-      marker: "square",
-    },
-    {
-      key: "remainingEstimate",
-      label: "Remaining Estimate",
-      color: "#ff3b30",
-      dash: "",
-      marker: "square",
-    },
-    {
-      key: "totalWork",
-      label: "Total Work",
-      color: "#8f1bb3",
-      dash: "8 6",
-      marker: "triangle",
-    },
-  ];
-
-  if (buffer.active) {
-    lineDefs.push({
-      key: "originalBuffer",
-      label:
-        buffer.mode === "add"
-          ? "Original Estimate (with buffer)"
-          : "Original Estimate (without buffer)",
-      color: "#b8860b",
-      dash: "4 4",
-      marker: "circle",
-    });
-  }
+  const lineDefs = getTrendLineDefs(buffer);
 
   const gridLines = Array.from({ length: yTicks + 1 }, (_, index) => {
     const value = (yMax / yTicks) * index;
@@ -1123,8 +1109,162 @@ function buildTrendChartMarkup(view = activeTrendView) {
   `;
 }
 
+// "New" design: the exact same series, colors, labels, markers, and hover
+// tooltips as the classic chart, only the surrounding look changes (cream
+// plot panel, a soft area fill under Cumulative Time Spent, hairline
+// gridlines, lighter axes). All functionality is preserved.
+function buildNewTrendMarkup(view = activeTrendView) {
+  const rawSeries = getVisibleTrendSeries(view);
+  if (!rawSeries.length) {
+    return "";
+  }
+
+  const buffer = getBufferSettings();
+  const series = buffer.active
+    ? rawSeries.map((point) => ({
+        ...point,
+        originalBuffer:
+          buffer.mode === "add"
+            ? Number(point.cumulativeOriginalEstimate) * (1 + buffer.p)
+            : Number(point.cumulativeOriginalEstimate) / (1 + buffer.p),
+      }))
+    : rawSeries;
+
+  const width = 1040;
+  const height = 420;
+  const margin = { top: 28, right: 30, bottom: 70, left: 70 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const xAxisY = height - margin.bottom;
+
+  const lineDefs = getTrendLineDefs(buffer);
+  const maxValue = Math.max(
+    ...series.flatMap((point) => lineDefs.map((line) => Number(point[line.key]) || 0)),
+    0
+  );
+  const yMax = Math.max(10, Math.ceil(maxValue / 25) * 25);
+  const yTicks = 5;
+
+  const xPosition = (index) =>
+    margin.left + (series.length === 1 ? plotWidth / 2 : (index / (series.length - 1)) * plotWidth);
+  const yPosition = (value) => margin.top + plotHeight - (Number(value) / yMax) * plotHeight;
+
+  const pointsOf = (key) => series.map((point, index) => ({ x: xPosition(index), y: yPosition(point[key]) }));
+
+  // Catmull-Rom spline -> cubic bezier, for smooth (not jagged) lines.
+  const smoothPath = (pts) => {
+    if (!pts.length) return "";
+    if (pts.length < 3) return `M ${pts.map((p) => `${p.x},${p.y}`).join(" L ")}`;
+    let d = `M ${pts[0].x},${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i += 1) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return d;
+  };
+  const smoothArea = (key) => {
+    const pts = pointsOf(key);
+    if (!pts.length) return "";
+    const baseline = yPosition(0);
+    return `${smoothPath(pts)} L ${pts[pts.length - 1].x},${baseline} L ${pts[0].x},${baseline} Z`;
+  };
+
+  const gridLines = Array.from({ length: yTicks + 1 }, (_, index) => {
+    const value = (yMax / yTicks) * index;
+    const y = yPosition(value);
+    return `
+      <line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="#edeef1" stroke-width="1" />
+      <text x="${margin.left - 14}" y="${y + 5}" text-anchor="end" class="trend-axis-label">${Math.round(value)}</text>
+    `;
+  }).join("");
+
+  const xLabels = series
+    .map(
+      (point, index) => `
+        <text x="${xPosition(index)}" y="${xAxisY + 22}" text-anchor="start" dominant-baseline="hanging"
+          transform="rotate(-40 ${xPosition(index)} ${xAxisY + 22})" class="trend-axis-label trend-axis-label-x">${escapeHtml(point.label)}</text>
+      `
+    )
+    .join("");
+
+  // Small uniform hover dots (value shown on hover via <title>), lighter than
+  // the classic mixed shapes so the smooth lines stay the focus.
+  const pointMarkers = lineDefs
+    .map((line) =>
+      series
+        .map((point, index) => {
+          const x = xPosition(index);
+          const y = yPosition(point[line.key]);
+          const tooltip = `${line.label}: ${formatTrendTooltipValue(point[line.key])}`;
+          return `<circle cx="${x}" cy="${y}" r="6" fill="transparent"><title>${escapeHtml(tooltip)}</title></circle>
+            <circle cx="${x}" cy="${y}" r="3" fill="#ffffff" stroke="${line.color}" stroke-width="1.6" pointer-events="none" />`;
+        })
+        .join("")
+    )
+    .join("");
+
+  const spentColor = lineDefs.find((line) => line.key === "cumulativeTimeSpent")?.color || "#1a33ff";
+
+  return `
+    <div class="trend-legend">
+      ${lineDefs
+        .map(
+          (line) => `
+            <div class="trend-legend-item">
+              <span class="trend-legend-swatch" style="--swatch:${line.color}; --dash:${line.dash || "none"};"></span>
+              <span>${line.label}</span>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+    <svg viewBox="0 0 ${width} ${height}" class="trend-svg trend-svg-new" aria-label="Historical project workload chart (new design)">
+      <defs>
+        <linearGradient id="newTrendSpentFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${spentColor}" stop-opacity="0.22" />
+          <stop offset="100%" stop-color="${spentColor}" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      <path d="${smoothArea("cumulativeTimeSpent")}" fill="url(#newTrendSpentFill)" stroke="none" />
+      ${lineDefs
+        .map(
+          (line) => `
+            <path
+              d="${smoothPath(pointsOf(line.key))}"
+              fill="none"
+              stroke="${line.color}"
+              stroke-width="${line.dash ? 2 : 2.6}"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              stroke-dasharray="${line.dash}"
+            />
+          `
+        )
+        .join("")}
+      ${pointMarkers}
+      <line x1="${margin.left}" y1="${xAxisY}" x2="${width - margin.right}" y2="${xAxisY}" stroke="#dcdee3" stroke-width="1" />
+      ${xLabels}
+      <text x="${margin.left - 48}" y="${margin.top - 6}" class="trend-axis-title">Hours</text>
+    </svg>
+  `;
+}
+
+function buildActiveTrendMarkup(view = activeTrendView) {
+  return trendDesign === "new"
+    ? buildNewTrendMarkup(view)
+    : buildTrendChartMarkup(view);
+}
+
 function renderTrendChart() {
-  const markup = buildTrendChartMarkup();
+  const markup = buildActiveTrendMarkup();
 
   if (!markup) {
     renderTrendEmptyState("No historical trend data is available for this selection.");
@@ -1136,6 +1276,9 @@ function renderTrendChart() {
   trendSection.classList.remove("hidden");
   trendToggleButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.trendView === activeTrendView);
+  });
+  trendDesignButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.trendDesign === trendDesign);
   });
 }
 
@@ -2040,7 +2183,7 @@ function downloadPdf() {
   const toneHours = (value) =>
     `<span class="${value < 0 ? "negative" : "positive"}">${formatHours(value)}</span>`;
 
-  const trendMarkup = buildTrendChartMarkup(activeTrendView);
+  const trendMarkup = buildActiveTrendMarkup(activeTrendView);
   const trendViewLabel = activeTrendView === "monthly" ? "Monthly view" : "Weekly view";
 
   const slipGainDisplay = (baseValue, basePct, key) => {
@@ -2712,6 +2855,35 @@ trendToggleButtons.forEach((button) => {
     }
   });
 });
+
+try {
+  const savedDesign = localStorage.getItem("trendDesign");
+  if (savedDesign === "classic" || savedDesign === "new") {
+    trendDesign = savedDesign;
+  }
+} catch (error) {
+  // localStorage unavailable; keep the default design.
+}
+
+trendDesignButtons.forEach((button) => {
+  button.classList.toggle("active", button.dataset.trendDesign === trendDesign);
+  button.addEventListener("click", () => {
+    trendDesign = button.dataset.trendDesign === "new" ? "new" : "classic";
+    try {
+      localStorage.setItem("trendDesign", trendDesign);
+    } catch (error) {
+      // ignore persistence failures
+    }
+    if (latestTrendData) {
+      renderTrendChart();
+    } else {
+      trendDesignButtons.forEach((b) =>
+        b.classList.toggle("active", b.dataset.trendDesign === trendDesign)
+      );
+    }
+  });
+});
+
 function syncBufferModeControl() {
   const active = getBufferSettings().active;
   bufferSegButtons.forEach((button) => {

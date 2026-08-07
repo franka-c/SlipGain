@@ -1520,3 +1520,9 @@ td:nth-child(2) {
   display: flex;
   justify-content: flex-end;
 }
+
+.trend-toggle-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
