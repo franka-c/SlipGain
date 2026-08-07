@@ -56,6 +56,7 @@ const reportMetadataSection = document.getElementById("report-metadata-section")
 const trendSection = document.getElementById("trend-section");
 const trendChart = document.getElementById("trend-chart");
 const trendToggleButtons = document.querySelectorAll("[data-trend-view]");
+const trendDesignButtons = document.querySelectorAll("[data-trend-design]");
 const trendControlsForm = document.getElementById("trend-controls-form");
 const loadTrendButton = document.getElementById("load-trend-button");
 const adminSection = document.getElementById("admin-section");
@@ -103,6 +104,7 @@ let accessToken = null;
 let latestEpicFilters = null;
 let selectedEpicKeysState = null;
 let activeTrendView = "weekly";
+let trendDesign = "classic";
 let currentUser = null;
 let approvedUsers = [];
 let pendingRequests = [];
@@ -1123,8 +1125,128 @@ function buildTrendChartMarkup(view = activeTrendView) {
   `;
 }
 
+// Alternate "Effort vs Budget" design (variant 1a from the shared design).
+// Same series as the classic chart, re-presented: spent as a filled area,
+// committed estimate as a line, forecast (= spent + remaining = totalWork) as a
+// dashed line, and a gold buffer corridor when a buffer % is set.
+function buildDeliveryChartMarkup(view = activeTrendView) {
+  const series = getVisibleTrendSeries(view);
+  if (!series.length) {
+    return "";
+  }
+
+  const buffer = getBufferSettings();
+  const bufferP = buffer.active ? buffer.p : 0;
+
+  const committed = (point) => Number(point.cumulativeOriginalEstimate) || 0;
+  const spent = (point) => Number(point.cumulativeTimeSpent) || 0;
+  const forecast = (point) => Number(point.totalWork) || 0;
+  const ceiling = (point) => committed(point) * (1 + bufferP);
+
+  const width = 1040;
+  const height = 440;
+  const margin = { top: 24, right: 156, bottom: 70, left: 70 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const xAxisY = height - margin.bottom;
+
+  const maxRaw = Math.max(
+    ...series.flatMap((point) => [
+      committed(point),
+      spent(point),
+      forecast(point),
+      buffer.active ? ceiling(point) : 0,
+    ]),
+    0
+  );
+  const yMax = Math.max(10, Math.ceil(maxRaw / 25) * 25);
+  const yTicks = 5;
+
+  const xPosition = (index) =>
+    margin.left + (series.length === 1 ? plotWidth / 2 : (index / (series.length - 1)) * plotWidth);
+  const yPosition = (value) => margin.top + plotHeight - (Number(value) / yMax) * plotHeight;
+
+  const linePoints = (fn) => series.map((point, index) => `${xPosition(index)},${yPosition(fn(point))}`).join(" ");
+  const areaPath = (fn) => {
+    const top = series.map((point, index) => `${xPosition(index)},${yPosition(fn(point))}`);
+    return `M ${xPosition(0)},${yPosition(0)} L ${top.join(" L ")} L ${xPosition(series.length - 1)},${yPosition(0)} Z`;
+  };
+  const bandPath = (lowerFn, upperFn) => {
+    const upper = series.map((point, index) => `${xPosition(index)},${yPosition(upperFn(point))}`);
+    const lower = series
+      .map((point, index) => `${xPosition(index)},${yPosition(lowerFn(point))}`)
+      .reverse();
+    return `M ${upper.join(" L ")} L ${lower.join(" L ")} Z`;
+  };
+
+  const gridLines = Array.from({ length: yTicks + 1 }, (_, index) => {
+    const value = (yMax / yTicks) * index;
+    const y = yPosition(value);
+    return `
+      <line x1="${margin.left}" y1="${y}" x2="${margin.left + plotWidth}" y2="${y}" class="trend-grid-line" />
+      <text x="${margin.left - 12}" y="${y + 5}" text-anchor="end" class="trend-axis-label">${Math.round(value)}</text>
+    `;
+  }).join("");
+
+  const xLabels = series
+    .map(
+      (point, index) => `
+        <text x="${xPosition(index)}" y="${xAxisY + 22}" text-anchor="start" dominant-baseline="hanging"
+          transform="rotate(-40 ${xPosition(index)} ${xAxisY + 22})" class="trend-axis-label trend-axis-label-x">${escapeHtml(point.label)}</text>
+      `
+    )
+    .join("");
+
+  const cSpent = "#224afa";
+  const cCommitted = "#262626";
+  const cBuffer = "#ad8634";
+  const labelX = margin.left + plotWidth + 10;
+  const inlineLabel = (fn, text, color) =>
+    `<text x="${labelX}" y="${yPosition(fn(series[series.length - 1])) + 4}" class="delivery-inline-label" fill="${color}">${escapeHtml(text)}</text>`;
+
+  const last = series[series.length - 1];
+  const bufferLeft = buffer.active ? ceiling(last) - forecast(last) : null;
+
+  return `
+    <div class="delivery-head">
+      <div>
+        <p class="delivery-eyebrow">Effort vs Budget</p>
+        <p class="delivery-subtitle">Spent, committed estimate${buffer.active ? ", and the buffer corridor" : ""} over time. Forecast = spent + remaining.</p>
+      </div>
+      <div class="delivery-stats">
+        <div class="delivery-stat"><span>Spent</span><strong style="color:${cSpent}">${formatHours(spent(last))}h</strong></div>
+        <div class="delivery-stat"><span>Forecast at completion</span><strong>${formatHours(forecast(last))}h</strong></div>
+        ${buffer.active ? `<div class="delivery-stat"><span>Buffer left</span><strong style="color:${cBuffer}">${formatHours(bufferLeft)}h</strong></div>` : ""}
+      </div>
+    </div>
+    <svg viewBox="0 0 ${width} ${height}" class="trend-svg" aria-label="Effort versus budget chart">
+      ${gridLines}
+      ${buffer.active ? `<path d="${bandPath(committed, ceiling)}" fill="rgba(173, 134, 52, 0.14)" stroke="none" />` : ""}
+      <path d="${areaPath(spent)}" fill="rgba(34, 74, 250, 0.10)" stroke="none" />
+      ${buffer.active ? `<polyline fill="none" stroke="${cBuffer}" stroke-width="1.6" stroke-dasharray="6 5" points="${linePoints(ceiling)}" />` : ""}
+      <polyline fill="none" stroke="${cSpent}" stroke-width="2" stroke-dasharray="6 5" opacity="0.55" points="${linePoints(forecast)}" />
+      <polyline fill="none" stroke="${cCommitted}" stroke-width="2" points="${linePoints(committed)}" />
+      <polyline fill="none" stroke="${cSpent}" stroke-width="3" points="${linePoints(spent)}" />
+      <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${xAxisY}" class="trend-axis-line" />
+      <line x1="${margin.left}" y1="${xAxisY}" x2="${margin.left + plotWidth}" y2="${xAxisY}" class="trend-axis-line" />
+      ${buffer.active ? inlineLabel(ceiling, "Buffer ceiling", cBuffer) : ""}
+      ${inlineLabel(forecast, "Forecast", cSpent)}
+      ${inlineLabel(spent, "Spent", cSpent)}
+      ${inlineLabel(committed, "Committed estimate", cCommitted)}
+      ${xLabels}
+      <text x="${margin.left - 48}" y="${margin.top - 6}" class="trend-axis-title">Hours</text>
+    </svg>
+  `;
+}
+
+function buildActiveTrendMarkup(view = activeTrendView) {
+  return trendDesign === "delivery"
+    ? buildDeliveryChartMarkup(view)
+    : buildTrendChartMarkup(view);
+}
+
 function renderTrendChart() {
-  const markup = buildTrendChartMarkup();
+  const markup = buildActiveTrendMarkup();
 
   if (!markup) {
     renderTrendEmptyState("No historical trend data is available for this selection.");
@@ -1136,6 +1258,9 @@ function renderTrendChart() {
   trendSection.classList.remove("hidden");
   trendToggleButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.trendView === activeTrendView);
+  });
+  trendDesignButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.trendDesign === trendDesign);
   });
 }
 
@@ -2040,7 +2165,7 @@ function downloadPdf() {
   const toneHours = (value) =>
     `<span class="${value < 0 ? "negative" : "positive"}">${formatHours(value)}</span>`;
 
-  const trendMarkup = buildTrendChartMarkup(activeTrendView);
+  const trendMarkup = buildActiveTrendMarkup(activeTrendView);
   const trendViewLabel = activeTrendView === "monthly" ? "Monthly view" : "Weekly view";
 
   const slipGainDisplay = (baseValue, basePct, key) => {
@@ -2712,6 +2837,35 @@ trendToggleButtons.forEach((button) => {
     }
   });
 });
+
+try {
+  const savedDesign = localStorage.getItem("trendDesign");
+  if (savedDesign === "classic" || savedDesign === "delivery") {
+    trendDesign = savedDesign;
+  }
+} catch (error) {
+  // localStorage unavailable; keep the default design.
+}
+
+trendDesignButtons.forEach((button) => {
+  button.classList.toggle("active", button.dataset.trendDesign === trendDesign);
+  button.addEventListener("click", () => {
+    trendDesign = button.dataset.trendDesign === "delivery" ? "delivery" : "classic";
+    try {
+      localStorage.setItem("trendDesign", trendDesign);
+    } catch (error) {
+      // ignore persistence failures
+    }
+    if (latestTrendData) {
+      renderTrendChart();
+    } else {
+      trendDesignButtons.forEach((b) =>
+        b.classList.toggle("active", b.dataset.trendDesign === trendDesign)
+      );
+    }
+  });
+});
+
 function syncBufferModeControl() {
   const active = getBufferSettings().active;
   bufferSegButtons.forEach((button) => {

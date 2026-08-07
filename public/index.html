@@ -324,9 +324,15 @@
             <p class="eyebrow">History</p>
             <h2>Workload Trend</h2>
           </div>
-          <div class="trend-toggle" role="tablist" aria-label="Trend view">
-            <button type="button" class="trend-toggle-button active" id="trend-weekly" data-trend-view="weekly">Weekly</button>
-            <button type="button" class="trend-toggle-button" id="trend-monthly" data-trend-view="monthly">Monthly</button>
+          <div class="trend-toggle-group">
+            <div class="trend-toggle" role="group" aria-label="Chart design">
+              <button type="button" class="trend-toggle-button active" data-trend-design="classic">Classic</button>
+              <button type="button" class="trend-toggle-button" data-trend-design="delivery">Delivery</button>
+            </div>
+            <div class="trend-toggle" role="tablist" aria-label="Trend view">
+              <button type="button" class="trend-toggle-button active" id="trend-weekly" data-trend-view="weekly">Weekly</button>
+              <button type="button" class="trend-toggle-button" id="trend-monthly" data-trend-view="monthly">Monthly</button>
+            </div>
           </div>
         </div>
         <p class="section-copy">Compare cumulative original estimate, logged time, remaining estimate, and total work over time for the currently included epics.</p>
