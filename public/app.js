@@ -1148,18 +1148,40 @@ function buildNewTrendMarkup(view = activeTrendView) {
   const xPosition = (index) =>
     margin.left + (series.length === 1 ? plotWidth / 2 : (index / (series.length - 1)) * plotWidth);
   const yPosition = (value) => margin.top + plotHeight - (Number(value) / yMax) * plotHeight;
-  const linePoints = (key) => series.map((point, index) => `${xPosition(index)},${yPosition(point[key])}`).join(" ");
-  const areaPath = (key) => {
-    const top = series.map((point, index) => `${xPosition(index)},${yPosition(point[key])}`);
-    return `M ${xPosition(0)},${yPosition(0)} L ${top.join(" L ")} L ${xPosition(series.length - 1)},${yPosition(0)} Z`;
+
+  const pointsOf = (key) => series.map((point, index) => ({ x: xPosition(index), y: yPosition(point[key]) }));
+
+  // Catmull-Rom spline -> cubic bezier, for smooth (not jagged) lines.
+  const smoothPath = (pts) => {
+    if (!pts.length) return "";
+    if (pts.length < 3) return `M ${pts.map((p) => `${p.x},${p.y}`).join(" L ")}`;
+    let d = `M ${pts[0].x},${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i += 1) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return d;
+  };
+  const smoothArea = (key) => {
+    const pts = pointsOf(key);
+    if (!pts.length) return "";
+    const baseline = yPosition(0);
+    return `${smoothPath(pts)} L ${pts[pts.length - 1].x},${baseline} L ${pts[0].x},${baseline} Z`;
   };
 
   const gridLines = Array.from({ length: yTicks + 1 }, (_, index) => {
     const value = (yMax / yTicks) * index;
     const y = yPosition(value);
     return `
-      <line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="#e6e2d8" stroke-width="1" />
-      <text x="${margin.left - 12}" y="${y + 5}" text-anchor="end" class="trend-axis-label">${Math.round(value)}</text>
+      <line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="#edeef1" stroke-width="1" />
+      <text x="${margin.left - 14}" y="${y + 5}" text-anchor="end" class="trend-axis-label">${Math.round(value)}</text>
     `;
   }).join("");
 
@@ -1172,6 +1194,8 @@ function buildNewTrendMarkup(view = activeTrendView) {
     )
     .join("");
 
+  // Small uniform hover dots (value shown on hover via <title>), lighter than
+  // the classic mixed shapes so the smooth lines stay the focus.
   const pointMarkers = lineDefs
     .map((line) =>
       series
@@ -1179,18 +1203,14 @@ function buildNewTrendMarkup(view = activeTrendView) {
           const x = xPosition(index);
           const y = yPosition(point[line.key]);
           const tooltip = `${line.label}: ${formatTrendTooltipValue(point[line.key])}`;
-          if (line.marker === "circle") {
-            return `<circle cx="${x}" cy="${y}" r="5" fill="${line.color}"><title>${escapeHtml(tooltip)}</title></circle>`;
-          }
-          if (line.marker === "triangle") {
-            const size = 7;
-            return `<polygon points="${x},${y - size} ${x - size},${y + size} ${x + size},${y + size}" fill="${line.color}"><title>${escapeHtml(tooltip)}</title></polygon>`;
-          }
-          return `<rect x="${x - 4.5}" y="${y - 4.5}" width="9" height="9" fill="${line.color}"><title>${escapeHtml(tooltip)}</title></rect>`;
+          return `<circle cx="${x}" cy="${y}" r="6" fill="transparent"><title>${escapeHtml(tooltip)}</title></circle>
+            <circle cx="${x}" cy="${y}" r="3" fill="#ffffff" stroke="${line.color}" stroke-width="1.6" pointer-events="none" />`;
         })
         .join("")
     )
     .join("");
+
+  const spentColor = lineDefs.find((line) => line.key === "cumulativeTimeSpent")?.color || "#1a33ff";
 
   return `
     <div class="trend-legend">
@@ -1206,27 +1226,31 @@ function buildNewTrendMarkup(view = activeTrendView) {
         .join("")}
     </div>
     <svg viewBox="0 0 ${width} ${height}" class="trend-svg trend-svg-new" aria-label="Historical project workload chart (new design)">
-      <rect x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}" fill="#faf8f3" stroke="none" />
+      <defs>
+        <linearGradient id="newTrendSpentFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${spentColor}" stop-opacity="0.22" />
+          <stop offset="100%" stop-color="${spentColor}" stop-opacity="0" />
+        </linearGradient>
+      </defs>
       ${gridLines}
-      <path d="${areaPath("cumulativeTimeSpent")}" fill="rgba(26, 51, 255, 0.08)" stroke="none" />
+      <path d="${smoothArea("cumulativeTimeSpent")}" fill="url(#newTrendSpentFill)" stroke="none" />
       ${lineDefs
         .map(
           (line) => `
-            <polyline
+            <path
+              d="${smoothPath(pointsOf(line.key))}"
               fill="none"
               stroke="${line.color}"
-              stroke-width="2"
+              stroke-width="${line.dash ? 2 : 2.6}"
               stroke-linejoin="round"
               stroke-linecap="round"
               stroke-dasharray="${line.dash}"
-              points="${linePoints(line.key)}"
             />
           `
         )
         .join("")}
       ${pointMarkers}
-      <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${xAxisY}" stroke="#d8d2c4" stroke-width="1.2" />
-      <line x1="${margin.left}" y1="${xAxisY}" x2="${width - margin.right}" y2="${xAxisY}" stroke="#d8d2c4" stroke-width="1.2" />
+      <line x1="${margin.left}" y1="${xAxisY}" x2="${width - margin.right}" y2="${xAxisY}" stroke="#dcdee3" stroke-width="1" />
       ${xLabels}
       <text x="${margin.left - 48}" y="${margin.top - 6}" class="trend-axis-title">Hours</text>
     </svg>
