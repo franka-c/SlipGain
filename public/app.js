@@ -2180,6 +2180,25 @@ function downloadPdf() {
   const modeWord = buffer?.mode === "add" ? "added" : "included";
   const pdfDual = (withHtml, withoutHtml) =>
     `<span class="buffer-dual"><span><em>with buffer</em> ${withHtml}</span><span><em>without</em> ${withoutHtml}</span></span>`;
+  // Summary-card values: a plain string, or { w, wo } shown under the card's
+  // "With buffer" / "Without" column headers.
+  const dual = (w, wo) => ({ w, wo });
+  const renderMetricCard = (title, items) => {
+    const hasDual = items.some(([, value]) => typeof value === "object");
+    const head = hasDual
+      ? `<div class="metric-item dual metric-head"><span></span><em>With buffer</em><em>Without</em></div>`
+      : "";
+    const rows = items
+      .map(([label, value]) => {
+        const cells =
+          typeof value === "object"
+            ? `<strong>${value.w}</strong><strong>${value.wo}</strong>`
+            : `<strong class="${hasDual ? "span-both" : ""}">${value}</strong>`;
+        return `<div class="metric-item${hasDual ? " dual" : ""}"><span>${escapeHtml(label)}</span>${cells}</div>`;
+      })
+      .join("");
+    return `<div class="card"><h2>${escapeHtml(title)}</h2><div class="metric-grid">${head}${rows}</div></div>`;
+  };
   const toneHours = (value) =>
     `<span class="${value < 0 ? "negative" : "positive"}">${formatHours(value)}</span>`;
 
@@ -2191,14 +2210,14 @@ function downloadPdf() {
       return `${formatPercent(basePct)} (${formatHours(baseValue)}h)`;
     }
     const g = buffer.slipGain[key];
-    return pdfDual(
-      `${formatPercent(g.withBufferPct)} (${formatHours(g.withBuffer)}h)`,
-      `${formatPercent(g.withoutBufferPct)} (${formatHours(g.withoutBuffer)}h)`
+    return dual(
+      `${formatPercent(g.withBufferPct)}<small>${formatHours(g.withBuffer)}h</small>`,
+      `${formatPercent(g.withoutBufferPct)}<small>${formatHours(g.withoutBuffer)}h</small>`
     );
   };
 
   const originalDisplay = bufferOn
-    ? pdfDual(formatHours(buffer.original.withBuffer), formatHours(buffer.original.withoutBuffer))
+    ? dual(formatHours(buffer.original.withBuffer), formatHours(buffer.original.withoutBuffer))
     : formatHours(summary.totalOriginalEstimate);
 
   const slipGainItems = [
@@ -2223,7 +2242,7 @@ function downloadPdf() {
     [
       "Time spent",
       bufferOn
-        ? pdfDual(
+        ? dual(
             formatPercent(buffer.timeSpentMetric.withBuffer),
             formatPercent(buffer.timeSpentMetric.withoutBuffer)
           )
@@ -2235,7 +2254,7 @@ function downloadPdf() {
     [
       "Projection of time spent till deadline",
       bufferOn && buffer.projection
-        ? pdfDual(
+        ? dual(
             formatPercent(buffer.projection.withBuffer),
             formatPercent(buffer.projection.withoutBuffer)
           )
@@ -2292,9 +2311,21 @@ function downloadPdf() {
           .topbar { display: flex; justify-content: space-between; align-items: start; gap: 24px; border-bottom: 2px solid #d9e4f6; padding-bottom: 14px; }
           .title-block small, .label { color: #5a6472; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
           .title-block h1 { margin-top: 6px; font-size: 30px; line-height: 1; }
-          .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+          .summary-grid { display: grid; grid-template-columns: 1.15fr 0.95fr 1.1fr; gap: 12px; align-items: stretch; }
+          .summary-grid .card { padding: 12px; border-radius: 12px; }
+          .summary-grid .card h2 { font-size: 14px; margin-bottom: 8px; }
+          .summary-grid .metric-grid { gap: 7px; }
+          .summary-grid .metric-item { font-size: 12px; gap: 8px; }
+          .summary-grid .metric-item strong { font-size: 12px; }
+          .metric-item.dual { grid-template-columns: minmax(0, 1fr) auto auto; }
+          .metric-item.dual strong { min-width: 44px; }
+          .metric-item strong small { display: block; font-size: 10px; font-weight: 600; color: #5a6472; }
+          .metric-item .span-both { grid-column: 2 / -1; }
+          .metric-head em { color: #5a6472; font-style: normal; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; text-align: right; white-space: nowrap; }
           .card { border: 1px solid #d7dee8; border-radius: 16px; padding: 16px; }
           .card h2 { font-size: 16px; margin-bottom: 12px; }
+          .card h2 { break-after: avoid; page-break-after: avoid; }
+          .slip-table tr { break-inside: avoid; page-break-inside: avoid; }
           .meta-grid { display: grid; gap: 8px; min-width: 260px; }
           .metric-grid { display: grid; gap: 10px; }
           .meta-item, .metric-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; font-size: 14px; }
@@ -2304,7 +2335,7 @@ function downloadPdf() {
           .buffer-dual { display: grid; gap: 2px; text-align: right; }
           .buffer-dual span { white-space: nowrap; }
           .buffer-dual em { color: #5a6472; font-style: normal; font-size: 11px; margin-right: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-          .trend-shell { display: grid; gap: 14px; }
+          .trend-shell { display: grid; gap: 14px; break-inside: avoid; page-break-inside: avoid; }
           .trend-copy { margin-top: 4px; color: #5a6472; font-size: 13px; }
           .trend-legend { display: flex; flex-wrap: wrap; gap: 12px 16px; margin-bottom: 10px; }
           .trend-legend-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
@@ -2339,52 +2370,9 @@ function downloadPdf() {
             </div>
           </section>
           <section class="summary-grid">
-            <div class="card">
-              <h2>Overview</h2>
-              <div class="metric-grid">
-                <div class="metric-item"><span>Original estimate</span><strong class="slip-value">${originalDisplay}</strong></div>
-                ${slipGainItems
-                  .map(
-                    ([label, value]) => `
-                      <div class="metric-item">
-                        <span>${escapeHtml(label)}</span>
-                        <strong class="slip-value">${value}</strong>
-                      </div>
-                    `
-                  )
-                  .join("")}
-              </div>
-            </div>
-            <div class="card">
-              <h2>Totals / Estimate Snapshot</h2>
-              <div class="metric-grid">
-                ${estimateItems
-                  .map(
-                    ([label, value]) => `
-                      <div class="metric-item">
-                        <span>${escapeHtml(label)}</span>
-                        <strong class="slip-value">${value}</strong>
-                      </div>
-                    `
-                  )
-                  .join("")}
-              </div>
-            </div>
-            <div class="card">
-              <h2>Workbook Metrics</h2>
-              <div class="metric-grid">
-                ${metricRows
-                  .map(
-                    ([label, value]) => `
-                      <div class="metric-item">
-                        <span>${escapeHtml(label)}</span>
-                        <strong class="slip-value">${value}</strong>
-                      </div>
-                    `
-                  )
-                  .join("")}
-              </div>
-            </div>
+            ${renderMetricCard("Overview", [["Original estimate", originalDisplay], ...slipGainItems])}
+            ${renderMetricCard("Totals / Estimate Snapshot", estimateItems)}
+            ${renderMetricCard("Workbook Metrics", metricRows)}
           </section>
           ${
             trendMarkup
