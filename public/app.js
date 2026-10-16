@@ -3385,6 +3385,7 @@ function enhanceDateInput(input) {
       inputValueDescriptor.set.call(this, value);
       display.value = formatDisplayDate(value);
       display.classList.remove("is-invalid");
+      display.removeAttribute("aria-invalid");
     },
   });
   display.value = formatDisplayDate(input.value);
@@ -3414,6 +3415,14 @@ function enhanceDateInput(input) {
     }
   });
   display.addEventListener("change", () => commitTypedDate(picker));
+  // Leaving the field with an unparseable date would show text the report is
+  // not using, so fall back to the last valid value.
+  display.addEventListener("blur", () => {
+    if (display.classList.contains("is-invalid")) {
+      display.value = formatDisplayDate(input.value);
+      setDateInvalid(picker, false);
+    }
+  });
 }
 
 function setPickerValue(picker, iso) {
@@ -3425,13 +3434,22 @@ function setPickerValue(picker, iso) {
   picker.input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function setDateInvalid(picker, invalid) {
+  picker.display.classList.toggle("is-invalid", invalid);
+  if (invalid) {
+    picker.display.setAttribute("aria-invalid", "true");
+  } else {
+    picker.display.removeAttribute("aria-invalid");
+  }
+}
+
 function commitTypedDate(picker) {
   const iso = parseTypedDate(picker.display.value);
   if (iso === null) {
-    picker.display.classList.add("is-invalid");
+    setDateInvalid(picker, true);
     return;
   }
-  picker.display.classList.remove("is-invalid");
+  setDateInvalid(picker, false);
   setPickerValue(picker, iso);
   picker.display.value = formatDisplayDate(iso);
   if (activeDatePicker === picker && iso) {
