@@ -1526,3 +1526,98 @@ td:nth-child(2) {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+.orphan-warning {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-lg);
+  color: #78350f;
+}
+
+.orphan-warning-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.orphan-warning-head p {
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+  color: #92400e;
+}
+
+.orphan-warning-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.orphan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-md);
+}
+
+.orphan-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 9px 12px;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.orphan-list li + li {
+  border-top: 1px solid #fef3c7;
+}
+
+.orphan-key {
+  min-width: 5.5em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.orphan-key a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.orphan-key a:hover {
+  text-decoration: underline;
+}
+
+.orphan-summary {
+  overflow-wrap: anywhere;
+}
+
+.orphan-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .orphan-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .orphan-meta {
+    grid-column: 2;
+  }
+}
