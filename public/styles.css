@@ -1171,7 +1171,11 @@ button:not(.secondary-button):not(.mini-action):not(.auth-link-button) *,
 }
 
 .snapshot-label {
-  align-self: center;
+  /* Sit on the date field's centre line, not the centre of field + label. */
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  min-height: 52px;
   color: var(--muted, #5a6472);
   font-size: 13px;
 }
