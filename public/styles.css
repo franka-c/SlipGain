@@ -1640,6 +1640,13 @@ td:nth-child(2) {
 }
 
 @media (max-width: 640px) {
+  /* Stack the title block above its description instead of squeezing both. */
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
   .orphan-list li {
     grid-template-columns: auto minmax(0, 1fr);
   }
