@@ -2566,6 +2566,11 @@ async function handleSignUp(event) {
   const email = document.getElementById("signup-email").value.trim();
   const password = document.getElementById("signup-password").value;
 
+  if (!email) {
+    setAuthStatus("Enter your work email.", true);
+    return;
+  }
+
   if (!isAllowedEmail(email)) {
     setAuthStatus(`Only @${allowedEmailDomain} email addresses are allowed.`, true);
     return;
@@ -2612,6 +2617,11 @@ async function handleSignIn(event) {
 
   const email = document.getElementById("signin-email").value.trim();
   const password = document.getElementById("signin-password").value;
+
+  if (!email) {
+    setAuthStatus("Enter your work email.", true);
+    return;
+  }
 
   if (!isAllowedEmail(email)) {
     setAuthStatus(`Only @${allowedEmailDomain} email addresses are allowed.`, true);
