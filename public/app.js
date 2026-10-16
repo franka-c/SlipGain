@@ -2566,6 +2566,11 @@ async function handleSignUp(event) {
   const email = document.getElementById("signup-email").value.trim();
   const password = document.getElementById("signup-password").value;
 
+  if (!email) {
+    setAuthStatus("Enter your work email.", true);
+    return;
+  }
+
   if (!isAllowedEmail(email)) {
     setAuthStatus(`Only @${allowedEmailDomain} email addresses are allowed.`, true);
     return;
@@ -2612,6 +2617,11 @@ async function handleSignIn(event) {
 
   const email = document.getElementById("signin-email").value.trim();
   const password = document.getElementById("signin-password").value;
+
+  if (!email) {
+    setAuthStatus("Enter your work email.", true);
+    return;
+  }
 
   if (!isAllowedEmail(email)) {
     setAuthStatus(`Only @${allowedEmailDomain} email addresses are allowed.`, true);
@@ -3257,6 +3267,433 @@ document.addEventListener("click", (event) => {
 });
 
 window.addEventListener("popstate", applyRouteVisibility);
+// Custom date picker. Each <input type="date"> becomes a hidden input that
+// still holds the ISO value (so FormData, .value and input/change listeners
+// keep working) plus a visible text field and a styled calendar popover.
+const DATE_PICKER_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const DATE_PICKER_WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const inputValueDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+let activeDatePicker = null;
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toIsoDate(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function fromIsoDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
+  if (!match) {
+    return null;
+  }
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return toIsoDate(date) === value ? date : null;
+}
+
+function formatDisplayDate(value) {
+  const date = fromIsoDate(value);
+  return date ? `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${date.getFullYear()}` : "";
+}
+
+// Accepts dd.mm.yyyy (also with / or - and an optional trailing dot) or ISO.
+function parseTypedDate(text) {
+  const trimmed = text.trim().replace(/\.$/, "");
+  if (!trimmed) {
+    return "";
+  }
+  if (fromIsoDate(trimmed)) {
+    return trimmed;
+  }
+  const match = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+  const iso = `${match[3]}-${pad2(match[2])}-${pad2(match[1])}`;
+  return fromIsoDate(iso) ? iso : null;
+}
+
+function addDays(date, days) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+function addMonthsClamped(date, months) {
+  const target = new Date(date.getFullYear(), date.getMonth() + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  return new Date(target.getFullYear(), target.getMonth(), Math.min(date.getDate(), lastDay));
+}
+
+function enhanceDateInputs() {
+  document.querySelectorAll('input[type="date"]').forEach(enhanceDateInput);
+
+  document.addEventListener("pointerdown", (event) => {
+    if (
+      activeDatePicker &&
+      !activeDatePicker.popover.contains(event.target) &&
+      !activeDatePicker.field.contains(event.target)
+    ) {
+      closeDatePicker();
+    }
+  });
+  window.addEventListener("resize", () => activeDatePicker && positionDatePicker());
+  window.addEventListener("scroll", () => activeDatePicker && positionDatePicker(), true);
+}
+
+function enhanceDateInput(input) {
+  const field = document.createElement("div");
+  field.className = "date-field";
+
+  const display = document.createElement("input");
+  display.type = "text";
+  display.id = `${input.id}-display`;
+  display.className = "date-display";
+  display.placeholder = "dd.mm.yyyy";
+  display.autocomplete = "off";
+  display.inputMode = "numeric";
+  display.setAttribute("aria-haspopup", "dialog");
+  display.setAttribute("aria-expanded", "false");
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "date-toggle";
+  toggle.tabIndex = -1;
+  toggle.setAttribute("aria-label", "Open calendar");
+  toggle.innerHTML =
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+
+  input.replaceWith(field);
+  input.type = "hidden";
+  field.append(display, toggle, input);
+  document.querySelectorAll(`label[for="${input.id}"]`).forEach((label) => {
+    label.htmlFor = display.id;
+  });
+
+  const picker = { input, display, field, toggle };
+  input.datePicker = picker;
+
+  // Programmatic writes (resets, defaults) must refresh the visible text.
+  Object.defineProperty(input, "value", {
+    configurable: true,
+    get() {
+      return inputValueDescriptor.get.call(this);
+    },
+    set(value) {
+      inputValueDescriptor.set.call(this, value);
+      display.value = formatDisplayDate(value);
+      display.classList.remove("is-invalid");
+      display.removeAttribute("aria-invalid");
+    },
+  });
+  display.value = formatDisplayDate(input.value);
+
+  display.addEventListener("click", () => openDatePicker(picker));
+  toggle.addEventListener("click", () => {
+    if (activeDatePicker === picker) {
+      closeDatePicker();
+    } else {
+      openDatePicker(picker, { focusGrid: true });
+    }
+  });
+  display.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      commitTypedDate(picker);
+      openDatePicker(picker, { focusGrid: true });
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      commitTypedDate(picker);
+      closeDatePicker();
+    } else if (event.key === "Escape" && activeDatePicker === picker) {
+      event.preventDefault();
+      closeDatePicker();
+    } else if (event.key === "Tab" && activeDatePicker === picker) {
+      closeDatePicker();
+    }
+  });
+  display.addEventListener("change", () => commitTypedDate(picker));
+  // Leaving the field with an unparseable date would show text the report is
+  // not using, so fall back to the last valid value.
+  display.addEventListener("blur", () => {
+    if (display.classList.contains("is-invalid")) {
+      display.value = formatDisplayDate(input.value);
+      setDateInvalid(picker, false);
+    }
+  });
+}
+
+function setPickerValue(picker, iso) {
+  if (picker.input.value === iso) {
+    return;
+  }
+  picker.input.value = iso;
+  picker.input.dispatchEvent(new Event("input", { bubbles: true }));
+  picker.input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setDateInvalid(picker, invalid) {
+  picker.display.classList.toggle("is-invalid", invalid);
+  if (invalid) {
+    picker.display.setAttribute("aria-invalid", "true");
+  } else {
+    picker.display.removeAttribute("aria-invalid");
+  }
+}
+
+function commitTypedDate(picker) {
+  const iso = parseTypedDate(picker.display.value);
+  if (iso === null) {
+    setDateInvalid(picker, true);
+    return;
+  }
+  setDateInvalid(picker, false);
+  setPickerValue(picker, iso);
+  picker.display.value = formatDisplayDate(iso);
+  if (activeDatePicker === picker && iso) {
+    picker.viewDate = fromIsoDate(iso);
+    picker.focusDate = picker.viewDate;
+    renderDatePicker();
+  }
+}
+
+function openDatePicker(picker, { focusGrid = false } = {}) {
+  if (activeDatePicker && activeDatePicker !== picker) {
+    closeDatePicker();
+  }
+  if (activeDatePicker !== picker) {
+    const selected = fromIsoDate(picker.input.value) || new Date();
+    picker.viewDate = new Date(selected.getFullYear(), selected.getMonth(), 1);
+    picker.focusDate = selected;
+    picker.mode = "days";
+    picker.popover = document.createElement("div");
+    picker.popover.className = "date-popover";
+    picker.popover.setAttribute("role", "dialog");
+    picker.popover.setAttribute("aria-label", "Choose date");
+    picker.popover.addEventListener("click", handleDatePickerClick);
+    picker.popover.addEventListener("keydown", handleDatePickerKeydown);
+    document.body.append(picker.popover);
+    activeDatePicker = picker;
+    picker.field.classList.add("is-open");
+    picker.display.setAttribute("aria-expanded", "true");
+    renderDatePicker();
+    positionDatePicker();
+  }
+  if (focusGrid) {
+    focusActiveDay();
+  }
+}
+
+function closeDatePicker({ restoreFocus = false } = {}) {
+  const picker = activeDatePicker;
+  if (!picker) {
+    return;
+  }
+  activeDatePicker = null;
+  picker.popover.remove();
+  picker.popover = null;
+  picker.field.classList.remove("is-open");
+  picker.display.setAttribute("aria-expanded", "false");
+  if (restoreFocus) {
+    picker.display.focus();
+  }
+}
+
+function positionDatePicker() {
+  const { field, popover } = activeDatePicker;
+  const rect = field.getBoundingClientRect();
+  const width = popover.offsetWidth;
+  const height = popover.offsetHeight;
+  const gap = 6;
+  const margin = 8;
+  const fitsBelow = rect.bottom + gap + height <= window.innerHeight - margin;
+  const top = fitsBelow || rect.top - gap - height < margin ? rect.bottom + gap : rect.top - gap - height;
+  const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+  popover.style.top = `${Math.round(top)}px`;
+  popover.style.left = `${Math.round(left)}px`;
+}
+
+function renderDatePicker() {
+  const picker = activeDatePicker;
+  const { viewDate } = picker;
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const chevron = (direction) =>
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${direction === "prev" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"}"/></svg>`;
+  const isDays = picker.mode === "days";
+  const head = `
+    <div class="date-popover-head">
+      <button type="button" class="date-popover-title" data-action="toggle-mode" aria-label="${isDays ? "Choose month and year" : "Back to days"}">
+        ${isDays ? `${DATE_PICKER_MONTHS[month]} <span>${year}</span>` : `<span class="is-strong">${year}</span>`}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="${isDays ? "m6 9 6 6 6-6" : "m6 15 6-6 6 6"}"/></svg>
+      </button>
+      <div class="date-popover-nav">
+        <button type="button" data-action="prev" aria-label="${isDays ? "Previous month" : "Previous year"}">${chevron("prev")}</button>
+        <button type="button" data-action="next" aria-label="${isDays ? "Next month" : "Next year"}">${chevron("next")}</button>
+      </div>
+    </div>`;
+
+  const selectedIso = picker.input.value;
+  const todayIso = toIsoDate(new Date());
+  let body;
+
+  if (isDays) {
+    const first = new Date(year, month, 1);
+    const start = addDays(first, -((first.getDay() + 6) % 7));
+    const focusIso = toIsoDate(picker.focusDate);
+    const cells = Array.from({ length: 42 }, (_, index) => {
+      const date = addDays(start, index);
+      const iso = toIsoDate(date);
+      const classes = ["date-day"];
+      if (date.getMonth() !== month) classes.push("is-outside");
+      if (index % 7 >= 5) classes.push("is-weekend");
+      if (iso === selectedIso) classes.push("is-selected");
+      if (iso === todayIso) classes.push("is-today");
+      const label = date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      return `<button type="button" class="${classes.join(" ")}" data-date="${iso}" tabindex="${iso === focusIso ? 0 : -1}" aria-label="${label}${iso === todayIso ? ", today" : ""}"${iso === selectedIso ? ' aria-pressed="true"' : ""}>${date.getDate()}</button>`;
+    }).join("");
+    body = `
+      <div class="date-weekdays" aria-hidden="true">${DATE_PICKER_WEEKDAYS.map((day) => `<span>${day}</span>`).join("")}</div>
+      <div class="date-days">${cells}</div>`;
+  } else {
+    const selected = fromIsoDate(selectedIso);
+    const now = new Date();
+    body = `<div class="date-months">${DATE_PICKER_MONTHS.map((name, index) => {
+      const classes = ["date-month"];
+      if (selected && selected.getFullYear() === year && selected.getMonth() === index) classes.push("is-selected");
+      if (now.getFullYear() === year && now.getMonth() === index) classes.push("is-today");
+      return `<button type="button" class="${classes.join(" ")}" data-month="${index}" tabindex="${index === month ? 0 : -1}">${name.slice(0, 3)}</button>`;
+    }).join("")}</div>`;
+  }
+
+  picker.popover.innerHTML = `${head}${body}
+    <div class="date-popover-foot">
+      <button type="button" class="date-clear" data-action="clear">Clear</button>
+      <button type="button" class="date-today" data-action="today">Today</button>
+    </div>`;
+}
+
+function focusActiveDay() {
+  activeDatePicker?.popover.querySelector('.date-days [tabindex="0"], .date-months [tabindex="0"]')?.focus();
+}
+
+function selectDate(picker, iso) {
+  setPickerValue(picker, iso);
+  closeDatePicker({ restoreFocus: true });
+}
+
+function moveDatePickerFocus(date) {
+  const picker = activeDatePicker;
+  picker.focusDate = date;
+  picker.viewDate = new Date(date.getFullYear(), date.getMonth(), 1);
+  renderDatePicker();
+  focusActiveDay();
+}
+
+function handleDatePickerClick(event) {
+  const picker = activeDatePicker;
+  const target = event.target.closest("button");
+  if (!picker || !target) {
+    return;
+  }
+
+  if (target.dataset.date) {
+    selectDate(picker, target.dataset.date);
+    return;
+  }
+  if (target.dataset.month) {
+    picker.mode = "days";
+    picker.viewDate = new Date(picker.viewDate.getFullYear(), Number(target.dataset.month), 1);
+    picker.focusDate = picker.viewDate;
+    renderDatePicker();
+    focusActiveDay();
+    return;
+  }
+
+  const step = picker.mode === "days" ? 1 : 12;
+  switch (target.dataset.action) {
+    case "prev":
+    case "next":
+      picker.viewDate = addMonthsClamped(picker.viewDate, target.dataset.action === "prev" ? -step : step);
+      picker.focusDate = picker.viewDate;
+      renderDatePicker();
+      picker.popover.querySelector(`[data-action="${target.dataset.action}"]`)?.focus();
+      break;
+    case "toggle-mode":
+      picker.mode = picker.mode === "days" ? "months" : "days";
+      renderDatePicker();
+      picker.popover.querySelector('[data-action="toggle-mode"]')?.focus();
+      break;
+    case "clear":
+      selectDate(picker, "");
+      break;
+    case "today":
+      selectDate(picker, toIsoDate(new Date()));
+      break;
+    default:
+      break;
+  }
+  positionDatePicker();
+}
+
+function handleDatePickerKeydown(event) {
+  const picker = activeDatePicker;
+  if (!picker) {
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeDatePicker({ restoreFocus: true });
+    return;
+  }
+  if (event.key === "Tab") {
+    // Keep focus inside the popover while it is open.
+    const focusable = [...picker.popover.querySelectorAll('button:not([tabindex="-1"])')];
+    const index = focusable.indexOf(document.activeElement);
+    if (event.shiftKey && index <= 0) {
+      event.preventDefault();
+      focusable.at(-1)?.focus();
+    } else if (!event.shiftKey && index === focusable.length - 1) {
+      event.preventDefault();
+      focusable[0]?.focus();
+    }
+    return;
+  }
+
+  const target = event.target.closest("button");
+  if (picker.mode === "days" && target?.dataset.date) {
+    const current = fromIsoDate(target.dataset.date);
+    const moves = {
+      ArrowLeft: () => addDays(current, -1),
+      ArrowRight: () => addDays(current, 1),
+      ArrowUp: () => addDays(current, -7),
+      ArrowDown: () => addDays(current, 7),
+      Home: () => addDays(current, -((current.getDay() + 6) % 7)),
+      End: () => addDays(current, 6 - ((current.getDay() + 6) % 7)),
+      PageUp: () => addMonthsClamped(current, event.shiftKey ? -12 : -1),
+      PageDown: () => addMonthsClamped(current, event.shiftKey ? 12 : 1),
+    };
+    if (moves[event.key]) {
+      event.preventDefault();
+      moveDatePickerFocus(moves[event.key]());
+    }
+  } else if (picker.mode === "months" && target?.dataset.month) {
+    const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 };
+    if (offsets[event.key] !== undefined) {
+      event.preventDefault();
+      const next = Number(target.dataset.month) + offsets[event.key];
+      picker.viewDate = new Date(picker.viewDate.getFullYear(), next, 1);
+      renderDatePicker();
+      focusActiveDay();
+    }
+  }
+}
+
+enhanceDateInputs();
+
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAuthInfoModal();

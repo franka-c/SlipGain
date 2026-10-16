@@ -1171,7 +1171,11 @@ button:not(.secondary-button):not(.mini-action):not(.auth-link-button) *,
 }
 
 .snapshot-label {
-  align-self: center;
+  /* Sit on the date field's centre line, not the centre of field + label. */
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  min-height: 52px;
   color: var(--muted, #5a6472);
   font-size: 13px;
 }
@@ -1636,6 +1640,13 @@ td:nth-child(2) {
 }
 
 @media (max-width: 640px) {
+  /* Stack the title block above its description instead of squeezing both. */
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
   .orphan-list li {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -1643,4 +1654,306 @@ td:nth-child(2) {
   .orphan-meta {
     grid-column: 2;
   }
+}
+
+.date-field {
+  position: relative;
+}
+
+.date-field .date-display {
+  padding-right: 46px;
+}
+
+.date-field.is-open .date-display {
+  outline: 2px solid rgba(34, 74, 250, 0.14);
+  border-color: var(--accent);
+}
+
+.date-field .date-display.is-invalid {
+  border-color: var(--danger);
+  outline: 2px solid rgba(220, 38, 38, 0.12);
+}
+
+.date-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.date-toggle:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.date-field.is-open .date-toggle {
+  color: var(--accent);
+}
+
+.date-popover {
+  position: fixed;
+  z-index: 900;
+  width: 304px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(23, 23, 23, 0.12), 0 2px 6px rgba(23, 23, 23, 0.06);
+  color: var(--text);
+  font-family: "Helvetica Now Display", Helvetica, system-ui, sans-serif;
+}
+
+.date-popover button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.date-popover button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.date-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.date-popover-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.date-popover-title span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.date-popover-title span.is-strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.date-popover-title:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.date-popover-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.date-popover-nav button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.date-popover-nav button:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.date-weekdays,
+.date-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  text-align: center;
+}
+
+.date-weekdays span {
+  padding: 6px 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.date-day,
+.date-month {
+  position: relative;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.date-day.is-weekend {
+  color: var(--muted);
+}
+
+.date-day.is-outside {
+  color: var(--border-strong);
+}
+
+.date-day:hover,
+.date-month:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.date-day.is-today::after,
+.date-month.is-today::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.date-day.is-selected,
+.date-month.is-selected {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 700;
+}
+
+.date-day.is-selected::after,
+.date-month.is-selected::after {
+  background: var(--accent-contrast);
+}
+
+.date-months {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.date-month {
+  height: 44px;
+}
+
+.date-popover-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ececef;
+}
+
+.date-clear {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.date-clear:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.date-today {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.date-today:hover {
+  background: #e0e7ff;
+  color: var(--accent);
+}
+
+/* Touch screens and narrow viewports: bring every calendar control to a
+   44px touch target. */
+@media (pointer: coarse), (max-width: 640px) {
+  .date-field .date-display {
+    padding-right: 52px;
+  }
+
+  .date-toggle {
+    right: 4px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .date-popover {
+    width: 328px;
+  }
+
+  .date-day {
+    height: 44px;
+  }
+
+  .date-month {
+    height: 48px;
+  }
+
+  .date-popover-title {
+    min-height: 44px;
+  }
+
+  .date-popover-nav button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .date-clear,
+  .date-today {
+    min-height: 44px;
+  }
+}
+
+/* The global button rules force white text on :active and color: inherit on
+   children at (0,3,1); these keep the calendar's own colors. */
+.date-popover .date-popover-title > span:not(.is-strong) {
+  color: var(--muted);
+}
+
+.date-popover button:not(.is-selected):active {
+  color: var(--text);
+}
+
+.date-popover button.date-today:not(.is-selected):active {
+  color: var(--accent);
+}
+
+.date-field button.date-toggle:not(.is-selected):active {
+  color: var(--accent);
 }
