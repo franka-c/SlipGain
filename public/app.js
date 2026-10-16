@@ -1978,10 +1978,13 @@ function renderOrphanWarning(issues, jiraBaseUrl) {
       const keyMarkup = jiraBaseUrl
         ? `<a href="${escapeHtml(`${jiraBaseUrl}/browse/${encodeURIComponent(issue.key)}`)}" target="_blank" rel="noopener noreferrer">${key}</a>`
         : key;
+      const labels = (issue.labels || [])
+        .map((label) => `<span class="orphan-label">${escapeHtml(label)}</span>`)
+        .join("");
       return `
         <li>
           <span class="orphan-key">${keyMarkup}</span>
-          <span class="orphan-summary">${escapeHtml(issue.summary)}</span>
+          <span class="orphan-summary">${escapeHtml(issue.summary)}${labels ? `<span class="orphan-labels">${labels}</span>` : ""}</span>
           <span class="orphan-meta">${escapeHtml(issue.issueType)}${issue.status ? ` · ${escapeHtml(issue.status)}` : ""}</span>
         </li>
       `;
