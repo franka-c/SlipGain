@@ -43,6 +43,7 @@ const filterToggleSummary = document.getElementById("filter-toggle-summary");
 const filterToggleIcon = document.getElementById("filter-toggle-icon");
 const generateActionGroup = document.getElementById("generate-action-group");
 const projectEmptyState = document.getElementById("project-empty-state");
+const orphanWarning = document.getElementById("orphan-warning");
 const projectSelect = document.getElementById("projectKey");
 const partialFilterSection = document.getElementById("partial-filter-section");
 const completionStateSelect = document.getElementById("completion-state");
@@ -1963,7 +1964,45 @@ function renderEpicOptions() {
   updateFilterToggleSummary();
 }
 
+function renderOrphanWarning(issues, jiraBaseUrl) {
+  if (!issues?.length) {
+    orphanWarning.innerHTML = "";
+    orphanWarning.classList.add("hidden");
+    return;
+  }
+
+  const count = issues.length;
+  const items = issues
+    .map((issue) => {
+      const key = escapeHtml(issue.key);
+      const keyMarkup = jiraBaseUrl
+        ? `<a href="${escapeHtml(`${jiraBaseUrl}/browse/${encodeURIComponent(issue.key)}`)}" target="_blank" rel="noopener noreferrer">${key}</a>`
+        : key;
+      return `
+        <li>
+          <span class="orphan-key">${keyMarkup}</span>
+          <span class="orphan-summary">${escapeHtml(issue.summary)}</span>
+          <span class="orphan-meta">${escapeHtml(issue.issueType)}${issue.status ? ` · ${escapeHtml(issue.status)}` : ""}</span>
+        </li>
+      `;
+    })
+    .join("");
+
+  orphanWarning.innerHTML = `
+    <div class="orphan-warning-head">
+      <span class="orphan-warning-icon" aria-hidden="true">!</span>
+      <div>
+        <strong>${count} ${count === 1 ? "task or bug has" : "tasks or bugs have"} no parent epic</strong>
+        <p>Time logged on ${count === 1 ? "it" : "these"} is not included in the report. Link ${count === 1 ? "it" : "them"} to an epic in Jira to count ${count === 1 ? "it" : "them"}.</p>
+      </div>
+    </div>
+    <ul class="orphan-list">${items}</ul>
+  `;
+  orphanWarning.classList.remove("hidden");
+}
+
 function resetPartialFilters() {
+  renderOrphanWarning(null);
   latestEpicFilters = null;
   selectedEpicKeysState = null;
   filterDisclosure.classList.add("hidden");
@@ -2113,6 +2152,7 @@ async function loadEpicFilters() {
     const data = await postJson("/api/epics", payload);
     hideError();
     renderPartialFilters(data);
+    renderOrphanWarning(data.orphanIssues, data.jiraBaseUrl);
     generateActionGroup.classList.toggle("hidden", data.epics.length === 0);
     setStatus(
       data.epics.length > 0
