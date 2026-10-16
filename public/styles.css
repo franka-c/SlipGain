@@ -1611,6 +1611,24 @@ td:nth-child(2) {
   overflow-wrap: anywhere;
 }
 
+.orphan-labels {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+
+.orphan-label {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .orphan-meta {
   color: var(--muted);
   font-size: 0.85rem;
