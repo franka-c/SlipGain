@@ -1528,6 +1528,7 @@ td:nth-child(2) {
 }
 
 .orphan-warning {
+  grid-column: 1 / -1;
   display: grid;
   gap: 12px;
   padding: 14px 16px;
@@ -1535,6 +1536,10 @@ td:nth-child(2) {
   border: 1px solid #fde68a;
   border-radius: var(--radius-lg);
   color: #78350f;
+}
+
+.orphan-warning.hidden {
+  display: none;
 }
 
 .orphan-warning-head {
