@@ -1889,6 +1889,46 @@ td:nth-child(2) {
   color: var(--accent);
 }
 
+/* Touch screens and narrow viewports: bring every calendar control to a
+   44px touch target. */
+@media (pointer: coarse), (max-width: 640px) {
+  .date-field .date-display {
+    padding-right: 52px;
+  }
+
+  .date-toggle {
+    right: 4px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .date-popover {
+    width: 328px;
+  }
+
+  .date-day {
+    height: 44px;
+  }
+
+  .date-month {
+    height: 48px;
+  }
+
+  .date-popover-title {
+    min-height: 44px;
+  }
+
+  .date-popover-nav button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .date-clear,
+  .date-today {
+    min-height: 44px;
+  }
+}
+
 /* The global button rules force white text on :active and color: inherit on
    children at (0,3,1); these keep the calendar's own colors. */
 .date-popover .date-popover-title > span:not(.is-strong) {
